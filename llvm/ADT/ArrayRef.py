@@ -20,7 +20,7 @@ class ArrayRef(ConvertibleType):
             writer.attr('derive', ['Copy'])
 
         writer.struct(members=[
-            (ptr(self.subtype).ffi_name(lang), 'data'),
+            (ptr(self.subtype, const=True).ffi_name(lang), 'data'),
             (SizeTy.ffi_name(lang), 'length'),
         ], name=self.flat_name())
 
@@ -74,7 +74,7 @@ class ArrayRef(ConvertibleType):
             struct_name = '::ffi::%s' % (self.ffi_name(lang))
             data_ptr = writer.gen.call(writer.gen.member(data, 'as_ptr'))
             return writer.gen.init_struct(struct_name, [
-                ('data', writer.gen.call('::std::mem::transmute', [data_ptr])),
+                ('data', data_ptr),
                 ('length', writer.gen.cast(writer.gen.call(writer.gen.member(expr, 'len')), SizeTy.ffi_name(lang))),
             ])
 
