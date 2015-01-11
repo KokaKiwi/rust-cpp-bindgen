@@ -5,13 +5,6 @@ An attempt to bind some C++ code to Rust.
 
 The binding is done by proxyfying C++ functions and methods to C-like functions, and binding them in Rust.
 
-Sample
-======
-
-A sample is available in the `llvm` directory, which describe the LLVM API.
-
-You can see the generated code by running the `rebuild.sh` script.
-
 WARNING
 =======
 
