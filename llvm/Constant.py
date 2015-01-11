@@ -25,11 +25,3 @@ UndefValue = llvm.Class('UndefValue', Constant)
 
 ConstantDataArray = llvm.Class('ConstantDataArray', ConstantDataSequential)
 ConstantDataVector = llvm.Class('ConstantDataVector', ConstantDataSequential)
-
-BinaryConstantExpr = llvm.Class('BinaryConstantExpr', ConstantExpr)
-CompareConstantExpr = llvm.Class('CompareConstantExpr', ConstantExpr)
-ExtractElementConstantExpr = llvm.Class('ExtractElementConstantExpr', ConstantExpr)
-ExtractValueConstantExpr = llvm.Class('ExtractValueConstantExpr', ConstantExpr)
-GetElementPtrConstantExpr = llvm.Class('GetElementPtrConstantExpr', ConstantExpr)
-InsertElementConstantExpr = llvm.Class('InsertElementConstantExpr', ConstantExpr)
-InsertValueConstantExpr = llvm.Class('InsertValueConstantExpr', ConstantExpr)
