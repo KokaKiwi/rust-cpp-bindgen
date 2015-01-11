@@ -37,6 +37,11 @@ class Class(Module, _Type):
             if isinstance(item, Destructor):
                 return item
 
+        for base in self.bases:
+            destructor = base.destructor
+            if destructor is not None:
+                return destructor
+
         return None
 
     @property

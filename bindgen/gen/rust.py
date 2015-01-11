@@ -589,7 +589,7 @@ class RustLibBindingGenerator(BindingGenerator):
 
             # Class methods
             for it in cls.items:
-                if isinstance(it, obj.Function) and not isinstance(it, obj.StaticMethod):
+                if isinstance(it, obj.Function) and not isinstance(it, (obj.StaticMethod, obj.Destructor)):
                     self._generate_tree_function(writer, tree, it)
 
         # Generate struct
@@ -643,13 +643,35 @@ class RustLibBindingGenerator(BindingGenerator):
                     self._generate_tree_function(writer, tree, it, pub=True)
 
         # Implement extra traits
+        def is_class_type(ty):
+            return isinstance(ty, (obj.Pointer, obj.Ref)) and isinstance(ty.subtype, obj.Class)
+
+        def resolve_type(ty, impl=False):
+            if is_class_type(ty):
+                name = resolve_type(ty.subtype)
+                if impl:
+                    fmt = RustLibConstants.STRUCT_NAME
+                else:
+                    fmt = RustLibConstants.TRAIT_NAME
+                return fmt.format(name=name)
+            return ty.lib_name('rust', tree=tree)
+
+        def get_inner(cls, expr):
+            name = resolve_type(cls)
+            meth = writer.gen.member(name, 'inner', static=True)
+            return writer.gen.call(meth, [expr])
 
         destructor = cls.destructor
         if destructor is not None:
             with writer.impl(struct_name, 'Drop'):
                 with writer.function('drop', args=['&mut self'], pub=False):
-                    call_name = writer.gen.member('self', destructor.name)
-                    writer.expr(writer.gen.call(call_name), discard=True)
+                    cls_path = destructor.path[:-1]
+                    ffi_name = '::ffi' + '%s_%s' % ('::'.join(cls_path), destructor.name)
+                    call_name = ffi_name
+                    inner = get_inner(obj.Pointer(destructor.parent), 'self')
+                    call = writer.gen.call(call_name, [inner])
+                    with writer.unsafe():
+                        writer.expr(call, discard=True)
         else:
             with writer.impl(struct_name, 'Copy'):
                 pass
