@@ -11,6 +11,7 @@ class Module(Entity):
 
         self.items = []
         self.includes = set()
+        self.types = []
 
     def extra(self, lang, writer):
         pass
@@ -36,6 +37,8 @@ class Module(Entity):
     def add_body_item(self, name, item):
         if name == '_includes_' and isinstance(item, (set, list, tuple)):
             self.includes |= set(item)
+        elif name == '_types_' and isinstance(item, (list)):
+            self.types += item
         elif name.startswith('_'):
             attr_name = name[1:-1]
             setattr(self, attr_name, item)
@@ -86,11 +89,6 @@ class Module(Entity):
     def namespaces(self):
         from .ns import Namespace
         return self.items_filter(Namespace)
-
-    @property
-    def types(self):
-        from .ty import Type
-        return self.items_filter(Type)
 
     @property
     def classes(self):

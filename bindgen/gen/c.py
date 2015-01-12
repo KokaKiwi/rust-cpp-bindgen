@@ -193,6 +193,8 @@ class CFFIBindingGenerator(BindingGenerator):
                         yield arg_ty
                 elif isinstance(item, obj.Class):
                     yield item
+                elif isinstance(item, obj.Module):
+                    yield from item.types
 
         types = set()
         for ty in traverse_types():
