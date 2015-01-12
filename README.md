@@ -5,6 +5,11 @@ An attempt to bind some C++ code to Rust.
 
 The binding is done by proxyfying C++ functions and methods to C-like functions, and binding them in Rust.
 
+Example
+=======
+
+You can check an usage example at: [https://github.com/KokaKiwi/rust-llvm](https://github.com/KokaKiwi/rust-llvm)
+
 WARNING
 =======
 
