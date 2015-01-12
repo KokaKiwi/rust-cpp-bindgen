@@ -84,7 +84,7 @@ class RustCodeGenerator(CodeGenerator):
             text += ' '*4
             if isinstance(value, tuple):
                 (value_name, value_val) = value
-                text += '%s = %d,\n' % (value_name, value_val)
+                text += '%s = %s,\n' % (value_name, value_val)
             else:
                 text += '%s,\n' % (value)
         text += '}'
@@ -362,7 +362,7 @@ class RustFFIBindingGenerator(BindingGenerator):
             if isinstance(item, obj.Namespace):
                 writer.writeln()
                 with writer.mod(item.name):
-                    writer.use(['super', 'raw'], pub=False)
+                    writer.use(['super', 'raw'])
 
                     self._generate_mod(writer, item)
             elif isinstance(item, obj.Module):
