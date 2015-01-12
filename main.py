@@ -1,10 +1,12 @@
 #!/usr/bin/env python
 import bindgen
+import sys
 from argparse import ArgumentParser
 from pathlib import Path
 
 def main(args):
     # Load module
+    sys.path.insert(0, '.')
     mod = __import__(args.source)
 
     if not hasattr(mod, 'root'):

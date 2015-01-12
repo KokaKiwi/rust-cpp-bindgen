@@ -153,7 +153,7 @@ class RustCodeGenerator(CodeGenerator):
         sep = '::' if static else '.'
         return '%s%s%s' % (expr, sep, name)
 
-    def attr(self, name, args, **kwargs):
+    def attr(self, name, args=[], **kwargs):
         g = '!' if kwargs.get('glob', False) else ''
 
         text = '#%s[%s' % (g, name)
@@ -518,6 +518,7 @@ class RustLibBindingGenerator(BindingGenerator):
 
         with path.open('w+') as f:
             writer = RustCodeWriter(self.gen, f)
+            writer.attr('experimental', glob=True)
             writer.attr('allow', ['non_camel_case_types', 'non_snake_case', 'raw_pointer_derive', 'unstable'], glob=True)
             writer.writeln()
             writer.extern_crate('libc')
