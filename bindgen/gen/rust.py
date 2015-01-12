@@ -576,6 +576,7 @@ class RustLibBindingGenerator(BindingGenerator):
         # Generate inner type
         ffi_typename = '::ffi::%s' % (cls.ffi_name('rust'))
         ffi_ptr_typename = '*mut %s' % (inner_name)
+        raw_inner_method_name = 'inner_%s' % (cls.flat_name())
 
         writer.typedef(inner_name, ffi_typename)
 
@@ -592,7 +593,11 @@ class RustLibBindingGenerator(BindingGenerator):
         writer.writeln()
         with writer.trait(trait_name, bases):
             writer.writeln()
-            writer.declare_function('inner', ffi_ptr_typename, ['&self'], pub=False)
+            writer.declare_function(raw_inner_method_name, ffi_ptr_typename, ['&self'], pub=False)
+
+            with writer.function('inner', ffi_ptr_typename, ['&self'], pub=False):
+                inner_method = writer.gen.member('self', raw_inner_method_name)
+                writer.expr(writer.gen.call(inner_method))
 
             # Class methods
             for it in sorted(cls.items, key=lambda item: item.name):
@@ -626,15 +631,16 @@ class RustLibBindingGenerator(BindingGenerator):
             base_name = RustLibConstants.TRAIT_NAME.format(name=base_name)
 
             base_ffi_typename = '::ffi::%s' % (base.item.ffi_name('rust'))
+            base_inner_method_name = 'inner_%s' % (base.item.flat_name())
 
             with writer.impl(struct_name, base_name):
-                with writer.function('inner', '*mut %s' % (base_ffi_typename), ['&self'], pub=False):
+                with writer.function(base_inner_method_name, '*mut %s' % (base_ffi_typename), ['&self'], pub=False):
                     with writer.unsafe():
                         writer.expr(writer.gen.call('::std::mem::transmute', ['self.inner']))
 
         # Implement class trait
         with writer.impl(struct_name, trait_name):
-            with writer.function('inner', ffi_ptr_typename, ['&self'], pub=False):
+            with writer.function(raw_inner_method_name, ffi_ptr_typename, ['&self'], pub=False):
                 writer.expr('self.inner')
 
         # Implement some specific methods
@@ -662,9 +668,12 @@ class RustLibBindingGenerator(BindingGenerator):
                 return fmt.format(name=name)
             return ty.lib_name('rust', tree=tree)
 
-        def get_inner(cls, expr):
-            name = resolve_type(cls)
-            meth = writer.gen.member(name, 'inner', static=True)
+        def get_inner(ptr, expr):
+            cls = ptr.subtype
+            inner_method_name = 'inner_%s' % (cls.flat_name())
+
+            name = resolve_type(ptr)
+            meth = writer.gen.member(name, inner_method_name, static=True)
             return writer.gen.call(meth, [expr])
 
         destructor = cls.destructor
@@ -699,10 +708,12 @@ class RustLibBindingGenerator(BindingGenerator):
                 return fmt.format(name=name)
             return ty.lib_name('rust', tree=tree)
 
-        def get_inner(cls, expr):
-            name = resolve_type(cls)
-            meth = writer.gen.member(name, 'inner', static=True)
-            return writer.gen.call(meth, [expr])
+        def get_inner(ptr, expr):
+            cls = ptr.subtype
+            inner_method_name = 'inner_%s' % (cls.flat_name())
+
+            meth = writer.gen.member(expr, inner_method_name)
+            return writer.gen.call(meth)
 
         name = camel_case_convert(func.name)
         ret_tyname = resolve_type(func.ret_ty, impl=True)
@@ -724,11 +735,14 @@ class RustLibBindingGenerator(BindingGenerator):
             arg_tyname = resolve_type(arg_ty)
 
             if is_class_type(arg_ty):
+                arg_tyname = '&%s' % (arg_tyname)
+                """
                 param_name = 'A%d' % (i + 1)
                 ty_param = '%s: %s' % (param_name, arg_tyname)
                 ty_params.append(ty_param)
 
                 arg_tyname = param_name
+                """
 
             args.append((arg_tyname, arg_name))
 
@@ -742,12 +756,12 @@ class RustLibBindingGenerator(BindingGenerator):
                     if isinstance(arg_ty, obj.ConvertibleType):
                         c_arg_name = 'c_%s' % (arg_name)
 
-                        value = arg_ty.convert_to_ffi(writer, 'rust', arg_name)
+                        value = arg_ty.convert_to_ffi(writer, 'rust', arg_name, get_inner=get_inner)
                         writer.declare_var(c_arg_name, init=value)
 
                         call_args.append(c_arg_name)
                     elif is_class_type(arg_ty):
-                        call_args.append(get_inner(arg_ty, writer.gen.borrow(arg_name)))
+                        call_args.append(get_inner(arg_ty, arg_name))
                     else:
                         call_args.append(arg_name)
 
@@ -772,7 +786,7 @@ class RustLibBindingGenerator(BindingGenerator):
 
                 if isinstance(func.ret_ty, obj.ConvertibleType):
                     writer.declare_var('ret', init=ret)
-                    ret = func.ret_ty.convert_from_ffi(writer, 'rust', 'ret')
+                    ret = func.ret_ty.convert_from_ffi(writer, 'rust', 'ret', get_inner=get_inner)
 
                 ret = func.ret_ty.transform('rustlib', ret, out=True)
 
