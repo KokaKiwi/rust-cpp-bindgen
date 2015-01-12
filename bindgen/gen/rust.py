@@ -314,7 +314,7 @@ class RustFFIBindingGenerator(BindingGenerator):
 
         # Write types
         def traverse_types():
-            for item in self.root.traverse():
+            for item in sorted(self.root.traverse(), key=lambda item: item.name):
                 if isinstance(item, obj.Function):
                     yield item.ret_ty
 
@@ -334,7 +334,7 @@ class RustFFIBindingGenerator(BindingGenerator):
         writer.writeln()
         with writer.mod('raw', pub=False):
             with writer.extern('C'):
-                for item in self.root.traverse():
+                for item in sorted(self.root.traverse(), key=lambda item: item.name):
                     if isinstance(item, obj.Function):
                         self._generate_ffi_function(writer, item)
 
@@ -356,7 +356,7 @@ class RustFFIBindingGenerator(BindingGenerator):
     def _generate_mod(self, writer, mod):
         from bindgen.ast import objects as obj
 
-        for item in mod.items:
+        for item in sorted(mod.items, key=lambda item: item.name):
             if isinstance(item, obj.Namespace):
                 writer.writeln()
                 with writer.mod(item.name):
@@ -553,11 +553,15 @@ class RustLibBindingGenerator(BindingGenerator):
     def _generate_tree_items(self, writer, tree):
         from bindgen.ast import objects as obj
 
-        for item in tree.items:
-            if isinstance(item.item, obj.Class):
-                self._generate_tree_class(writer, tree, item)
-            elif isinstance(item.item, obj.Function):
-                self._generate_tree_function(writer, tree, item.item, pub=True)
+        def sorted_filter(_filter, key, items):
+            return sorted(filter(_filter, items), key=key)
+
+        # Write classes
+        for item in sorted_filter(lambda item: isinstance(item.item, obj.Class), lambda item: item.item.name, tree.items):
+            self._generate_tree_class(writer, tree, item)
+
+        for item in sorted_filter(lambda item: isinstance(item.item, obj.Function), lambda item: item.item.name, tree.items):
+            self._generate_tree_function(writer, tree, item.item, pub=True)
 
     def _generate_tree_class(self, writer, tree, item):
         from bindgen.ast import objects as obj
@@ -589,7 +593,7 @@ class RustLibBindingGenerator(BindingGenerator):
             writer.declare_function('inner', ffi_ptr_typename, ['&self'], pub=False)
 
             # Class methods
-            for it in cls.items:
+            for it in sorted(cls.items, key=lambda item: item.name):
                 if isinstance(it, obj.Function) and not isinstance(it, (obj.StaticMethod, obj.Destructor)):
                     self._generate_tree_function(writer, tree, it)
 
@@ -639,9 +643,8 @@ class RustLibBindingGenerator(BindingGenerator):
                 ])
 
             # Static methods
-            for it in cls.items:
-                if isinstance(it, obj.StaticMethod):
-                    self._generate_tree_function(writer, tree, it, pub=True)
+            for it in sorted(filter(lambda item: isinstance(item, obj.StaticMethod), cls.items), key=lambda item: item.name):
+                self._generate_tree_function(writer, tree, it, pub=True)
 
         # Implement extra traits
         def is_class_type(ty):

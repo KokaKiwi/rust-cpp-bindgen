@@ -179,7 +179,7 @@ class CFFIBindingGenerator(BindingGenerator):
                 includes |= item.includes
 
         writer.include('string', system=True)
-        for include in includes:
+        for include in sorted(includes):
             writer.include(include)
         writer.writeln()
 
