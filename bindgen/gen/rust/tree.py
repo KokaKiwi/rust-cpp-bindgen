@@ -98,3 +98,11 @@ def make_tree(root):
         add_item(path, item)
 
     return tree
+
+def ty_filter(ty):
+    def _filter(item):
+        return isinstance(item.item, ty)
+    return _filter
+
+def item_key(item):
+    return item.item.name

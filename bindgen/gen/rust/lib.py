@@ -41,10 +41,39 @@ class RustLibBindingGenerator(BindingGenerator):
             writer.extern_crate('libc')
             writer.writeln()
             writer.declare_mod('ffi')
-            writer.writeln()
+            writer.declare_mod('traits')
             self._generate_tree_def(writer, tree)
 
+        # Generate tree
         self._generate_tree(tree, dest)
+
+        # Generate traits file
+        path = dest / 'traits.rs'
+        self.makedir(path.parent)
+
+        with path.open('w+') as f:
+            writer = RustCodeWriter(self.gen, f)
+            self._generate_traits(writer, tree)
+
+    def _generate_traits(self, writer, tree):
+        from bindgen.ast import objects as obj
+        from .tree import item_key
+
+        for (name, subtree) in tree.subtrees.items():
+            self._generate_traits(writer, subtree)
+
+        for item in sorted(tree.items, key=item_key):
+            if isinstance(item.item, obj.Class):
+                self._generate_trait(writer, item)
+
+    def _generate_trait(self, writer, item):
+        cls = item.item
+        trait_name = RustLibConstants.TRAIT_NAME.format(name=cls.name)
+
+        path = [''] + item.path + [trait_name]
+        name = '::'.join(path)
+
+        writer.use([name])
 
     def _generate_tree_def(self, writer, tree):
         for name in tree.subtrees.keys():
@@ -69,17 +98,10 @@ class RustLibBindingGenerator(BindingGenerator):
 
     def _generate_tree_items(self, writer, tree):
         from bindgen.ast import objects as obj
+        from .tree import ty_filter, item_key
 
         def sorted_filter(_filter, key, items):
             return sorted(filter(_filter, items), key=key)
-
-        def ty_filter(ty):
-            def _filter(item):
-                return isinstance(item.item, ty)
-            return _filter
-
-        def item_key(item):
-            return item.item.name
 
         # Write classes
         for item in sorted_filter(ty_filter(obj.Enum), item_key, tree.items):
