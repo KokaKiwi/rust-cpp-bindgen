@@ -37,8 +37,11 @@ class RustLibBindingGenerator(BindingGenerator):
             writer = RustCodeWriter(self.gen, f)
             writer.attr('experimental', glob=True)
             writer.attr('allow', ['unstable'], glob=True)
+            # writer.attr('no_std', glob=True)
             writer.writeln()
+            writer.extern_crate('core')
             writer.extern_crate('libc')
+            self._generate_tree_uses(writer, tree)
             writer.writeln()
             writer.declare_mod('ffi')
             writer.declare_mod('traits')
@@ -75,6 +78,11 @@ class RustLibBindingGenerator(BindingGenerator):
 
         writer.use([name])
 
+    def _generate_tree_uses(self, writer, tree):
+        # writer.writeln()
+        # writer.use(['', 'core', 'prelude', '*'])
+        pass
+
     def _generate_tree_def(self, writer, tree):
         for name in tree.subtrees.keys():
             writer.declare_mod(name)
@@ -93,6 +101,7 @@ class RustLibBindingGenerator(BindingGenerator):
 
             with fpath.open('w+') as f:
                 writer = RustCodeWriter(self.gen, f)
+                self._generate_tree_uses(writer, tree)
                 self._generate_tree_def(writer, tree)
                 self._generate_tree_items(writer, tree)
 
@@ -129,7 +138,6 @@ class RustLibBindingGenerator(BindingGenerator):
                 values.append(value)
         values = [underscore_to_camelcase(value) for value in values]
 
-        writer.attr('derive', ['Copy'])
         writer.enum(enum_name, values)
 
         # Impl enum
@@ -178,6 +186,8 @@ class RustLibBindingGenerator(BindingGenerator):
 
                         mpattern = writer.gen.match_pattern(name, ffi_name)
                         writer.writeln('%s,' % (mpattern))
+
+        writer.simple_impl(enum_name, 'Copy')
 
     def _generate_tree_class(self, writer, tree, item):
         from bindgen.ast import objects as obj
@@ -262,7 +272,7 @@ class RustLibBindingGenerator(BindingGenerator):
             with writer.impl(struct_name, base_name):
                 with writer.function(base_inner_method_name, '*mut %s' % (base_ffi_typename), ['&self'], pub=False):
                     with writer.unsafe():
-                        writer.expr(writer.gen.call('::std::mem::transmute', ['self.inner']))
+                        writer.expr(writer.gen.call('::core::mem::transmute', ['self.inner']))
 
         # Implement class trait
         with writer.impl(struct_name, trait_name):
@@ -298,8 +308,7 @@ class RustLibBindingGenerator(BindingGenerator):
                         with writer.unsafe():
                             writer.expr(call, discard=True)
         else:
-            with writer.impl(struct_name, 'Copy'):
-                pass
+            writer.simple_impl(struct_name, 'Copy')
 
     def _generate_tree_function(self, writer, tree, func, **kwargs):
         from bindgen.ast import objects as obj
