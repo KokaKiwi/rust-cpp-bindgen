@@ -187,6 +187,8 @@ class RustLibBindingGenerator(BindingGenerator):
         struct_name = RustLibConstants.STRUCT_NAME.format(name=cls.name)
         inner_name = RustLibConstants.INNER_NAME.format(name=cls.name)
 
+        destructor = cls.destructor
+
         # Generate enums
         for it in sorted(cls.items, key=lambda item: item.name):
             if isinstance(it, obj.Enum):
@@ -226,9 +228,13 @@ class RustLibBindingGenerator(BindingGenerator):
 
         # Generate struct
         writer.writeln()
-        writer.struct(struct_name, [
+
+        members = [
             ('*mut %s' % (inner_name), 'priv:inner'),
-        ])
+        ]
+        if destructor is not None:
+            members.append(('bool', 'priv:owned'))
+        writer.struct(struct_name, members)
 
         # Implement bases
         def find_bases_tree(cls):
@@ -265,17 +271,19 @@ class RustLibBindingGenerator(BindingGenerator):
 
         # Implement some specific methods
         with writer.impl(struct_name):
-            with writer.function('from_inner', struct_name, [(ffi_ptr_typename, 'inner')], unsafe=True):
-                writer.init_struct(struct_name, [
-                    ('inner', 'inner'),
-                ])
+            args = [(ffi_ptr_typename, 'inner')]
+            members = [('inner', 'inner')]
+            if destructor is not None:
+                args.append(('bool', 'owned'))
+                members.append(('owned', 'owned'))
+            with writer.function('from_inner', struct_name, args, unsafe=True):
+                writer.init_struct(struct_name, members)
 
             # Static methods
             for it in sorted(filter(lambda item: isinstance(item, obj.StaticMethod), cls.items), key=lambda item: item.name):
                 self._generate_tree_function(writer, tree, it, pub=True)
 
         # Implement extra traits
-        destructor = cls.destructor
         if destructor is not None:
             with writer.impl(struct_name, 'Drop'):
                 with writer.function('drop', args=['&mut self'], pub=False):
@@ -284,8 +292,11 @@ class RustLibBindingGenerator(BindingGenerator):
                     call_name = ffi_name
                     inner = get_inner_static(tree, writer, obj.Pointer(destructor.parent), 'self')
                     call = writer.gen.call(call_name, [inner])
-                    with writer.unsafe():
-                        writer.expr(call, discard=True)
+
+                    writer.write('if self.owned ')
+                    with writer.block():
+                        with writer.unsafe():
+                            writer.expr(call, discard=True)
         else:
             with writer.impl(struct_name, 'Copy'):
                 pass
@@ -363,12 +374,24 @@ class RustLibBindingGenerator(BindingGenerator):
                 ret = func.ret_ty.transform('rustlib', ret, out=True)
 
                 if obj.is_class_type(func.ret_ty):
-                    name = RustLibConstants.STRUCT_NAME.format(name=tree.resolve_type(func.ret_ty.subtype))
-                    ret_ffi_typename = '::ffi::%s' % (func.ret_ty.subtype.ffi_name('rust'))
+                    cls = func.ret_ty.subtype
+
+                    name = RustLibConstants.STRUCT_NAME.format(name=tree.resolve_type(cls))
+                    ret_ffi_typename = '::ffi::%s' % (cls.ffi_name('rust'))
                     from_inner = writer.gen.member(name, 'from_inner', static=True)
                     if func.ret_ty.const:
                         ret = writer.gen.cast(ret, '*mut %s' % (ret_ffi_typename))
-                    ret = writer.gen.call(from_inner, [ret])
+
+                    args = [ret]
+                    if cls.destructor is not None:
+                        owned = isinstance(func, obj.Constructor)
+                        if isinstance(func.ret_ty, obj.Pointer):
+                            owned |= func.ret_ty.owned
+
+                        owned = 'true' if owned else 'false'
+                        args.append(owned)
+
+                    ret = writer.gen.call(from_inner, args)
 
                 discard = func.ret_ty == obj.Void
                 writer.expr(ret, discard=discard)
