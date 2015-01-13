@@ -150,7 +150,7 @@ class RustCodeGenerator(CodeGenerator):
         return text
 
     def ret(self, expr):
-        return 'return %s;' % (value)
+        return 'return %s;' % (expr)
 
     def member(self, expr, name, static=False):
         sep = '::' if static else '.'
