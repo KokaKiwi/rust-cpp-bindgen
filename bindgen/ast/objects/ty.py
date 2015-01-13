@@ -123,6 +123,7 @@ class String(ConvertibleType):
     def write_def(self, lang, writer):
         if lang == 'rust':
             writer.attr('repr', ['C'])
+            writer.attr('allow', ['raw_pointer_derive'])
             writer.attr('derive', ['Copy'])
 
         writer.struct(members=[

@@ -18,6 +18,10 @@ class RustFFIBindingGenerator(BindingGenerator):
     def _generate(self, writer):
         from bindgen.ast import objects as obj
 
+        # Writer header
+        writer.attr('allow', ['non_camel_case_types', 'non_snake_case', 'unstable'], glob=True)
+        writer.writeln()
+
         # Write types
         def traverse_types():
             for item in sorted(self.root.traverse(), key=lambda item: item.name):
@@ -30,6 +34,8 @@ class RustFFIBindingGenerator(BindingGenerator):
                     yield item
                 elif isinstance(item, obj.Module):
                     yield from item.types
+                elif isinstance(item, obj.Enum):
+                    yield item
 
         types = set()
         for ty in traverse_types():

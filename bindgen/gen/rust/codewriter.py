@@ -51,6 +51,19 @@ class RustCodeWriter(CodeWriter):
             yield
 
     @contextmanager
+    def match(self, *args, **kwargs):
+        self.write(self.gen.match(*args, **kwargs))
+        self.write(' ')
+        with self.block():
+            yield
+
+    @contextmanager
+    def match_pattern(self, *args, **kwargs):
+        self.write(self.gen.match_pattern(*args, **kwargs))
+        with self.block():
+            yield
+
+    @contextmanager
     def block(self):
         self.writeln('{')
         with self.indent():

@@ -5,11 +5,19 @@ from .tree import make_tree
 from .utils import get_inner, get_inner_static
 from .. import BindingGenerator
 
-def camel_case_convert(name):
+def camelcase_to_underscore(name):
     import re
 
     s1 = re.sub('(.)([A-Z][a-z]+)', r'\1_\2', name)
     return re.sub('([a-z0-9])([A-Z])', r'\1_\2', s1).lower()
+
+camel_case_convert = camelcase_to_underscore
+
+def underscore_to_camelcase(name):
+    def title(s):
+        s = s[0].upper() + s[1:]
+        return s
+    return "".join(title(x) if x else '_' for x in name.split("_"))
 
 class RustLibBindingGenerator(BindingGenerator):
     def __init__(self, root):
@@ -28,7 +36,7 @@ class RustLibBindingGenerator(BindingGenerator):
         with path.open('w+') as f:
             writer = RustCodeWriter(self.gen, f)
             writer.attr('experimental', glob=True)
-            writer.attr('allow', ['non_camel_case_types', 'non_snake_case', 'raw_pointer_derive', 'unstable'], glob=True)
+            writer.attr('allow', ['unstable'], glob=True)
             writer.writeln()
             writer.extern_crate('libc')
             writer.writeln()
@@ -65,12 +73,89 @@ class RustLibBindingGenerator(BindingGenerator):
         def sorted_filter(_filter, key, items):
             return sorted(filter(_filter, items), key=key)
 
+        def ty_filter(ty):
+            def _filter(item):
+                return isinstance(item.item, ty)
+            return _filter
+
+        def item_key(item):
+            return item.item.name
+
         # Write classes
-        for item in sorted_filter(lambda item: isinstance(item.item, obj.Class), lambda item: item.item.name, tree.items):
+        for item in sorted_filter(ty_filter(obj.Enum), item_key, tree.items):
+            self._generate_tree_enum(writer, tree, item.item)
+
+        for item in sorted_filter(ty_filter(obj.Class), item_key, tree.items):
             self._generate_tree_class(writer, tree, item)
 
-        for item in sorted_filter(lambda item: isinstance(item.item, obj.Function), lambda item: item.item.name, tree.items):
+        for item in sorted_filter(ty_filter(obj.Function), item_key, tree.items):
             self._generate_tree_function(writer, tree, item.item, pub=True)
+
+    def _generate_tree_enum(self, writer, tree, enum):
+        from bindgen.ast import objects as obj
+
+        enum_name = enum.name
+        ffi_enum_name = enum.ffi_name('rust', path=['', 'ffi'])
+
+        # Writer enum
+        values = []
+        for value in enum.values:
+            if isinstance(value, tuple):
+                (name, value) = value
+                values.append(name)
+            else:
+                values.append(value)
+        values = [underscore_to_camelcase(value) for value in values]
+
+        writer.attr('derive', ['Copy'])
+        writer.enum(enum_name, values)
+
+        # Impl enum
+        with writer.impl(enum_name):
+            # Convert from FFI
+            with writer.function('from_ffi', enum_name, [(ffi_enum_name, 'value')]):
+                with writer.match('value'):
+                    patterns = []
+                    for value in enum.values:
+                        if isinstance(value, tuple):
+                            (name, value) = value
+
+                            if isinstance(value, str):
+                                continue
+                        else:
+                            name = value
+
+                        patterns.append((name, name))
+
+                    for (name, ffi_name) in patterns:
+                        name = '%s::%s' % (enum_name, underscore_to_camelcase(name))
+                        ffi_name = '%s::%s' % (ffi_enum_name, ffi_name)
+
+                        mpattern = writer.gen.match_pattern(ffi_name, name)
+                        writer.writeln('%s,' % (mpattern))
+
+            # Convert to FFI
+            with writer.function('to_ffi', ffi_enum_name, ['self']):
+                with writer.match('self'):
+                    patterns = []
+                    for value in enum.values:
+                        if isinstance(value, tuple):
+                            (name, value) = value
+                            ffi_name = name
+
+                            if isinstance(value, str):
+                                ffi_name = value
+                        else:
+                            name = ffi_name = value
+
+                        patterns.append((name, ffi_name))
+
+                    for (name, ffi_name) in patterns:
+                        name = '%s::%s' % (enum_name, underscore_to_camelcase(name))
+                        ffi_name = '%s::%s' % (ffi_enum_name, ffi_name)
+
+                        mpattern = writer.gen.match_pattern(name, ffi_name)
+                        writer.writeln('%s,' % (mpattern))
 
     def _generate_tree_class(self, writer, tree, item):
         from bindgen.ast import objects as obj
@@ -79,6 +164,11 @@ class RustLibBindingGenerator(BindingGenerator):
         trait_name = RustLibConstants.TRAIT_NAME.format(name=cls.name)
         struct_name = RustLibConstants.STRUCT_NAME.format(name=cls.name)
         inner_name = RustLibConstants.INNER_NAME.format(name=cls.name)
+
+        # Generate enums
+        for it in sorted(cls.items, key=lambda item: item.name):
+            if isinstance(it, obj.Enum):
+                self._generate_tree_enum(writer, tree, it)
 
         # Generate inner type
         ffi_typename = '::ffi::%s' % (cls.ffi_name('rust'))
@@ -99,9 +189,10 @@ class RustLibBindingGenerator(BindingGenerator):
 
         writer.writeln()
         with writer.trait(trait_name, bases):
-            writer.writeln()
+            writer.attr('allow', ['non_snake_case'])
             writer.declare_function(raw_inner_method_name, ffi_ptr_typename, ['&self'], pub=False)
 
+            writer.writeln()
             with writer.function('inner', ffi_ptr_typename, ['&self'], pub=False):
                 inner_method = writer.gen.member('self', raw_inner_method_name)
                 writer.expr(writer.gen.call(inner_method))
@@ -202,13 +293,6 @@ class RustLibBindingGenerator(BindingGenerator):
 
             if obj.is_class_type(arg_ty):
                 arg_tyname = '&%s' % (arg_tyname)
-                """
-                param_name = 'A%d' % (i + 1)
-                ty_param = '%s: %s' % (param_name, arg_tyname)
-                ty_params.append(ty_param)
-
-                arg_tyname = param_name
-                """
 
             args.append((arg_tyname, arg_name))
 

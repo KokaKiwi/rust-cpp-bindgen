@@ -87,7 +87,7 @@ def make_tree(root):
         for item in mod.items:
             if isinstance(item, obj.Namespace):
                 yield from items(item)
-            elif isinstance(item, (obj.Function, obj.Class)):
+            elif isinstance(item, (obj.Function, obj.Class, obj.Enum)):
                 yield item
 
     for item in items(root):

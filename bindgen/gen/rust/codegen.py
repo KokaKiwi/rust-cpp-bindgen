@@ -113,6 +113,12 @@ class RustCodeGenerator(CodeGenerator):
 
         return text
 
+    def match(self, expr):
+        return 'match %s' % (expr)
+
+    def match_pattern(self, pattern, value=''):
+        return '%s => %s' % (pattern, value)
+
     def cast(self, expr, ty):
         return '%s as %s' % (expr, ty)
 
