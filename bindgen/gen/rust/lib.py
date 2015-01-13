@@ -240,7 +240,7 @@ class RustLibBindingGenerator(BindingGenerator):
         writer.writeln()
 
         members = [
-            ('*mut %s' % (inner_name), 'priv:inner'),
+            ('::core::nonzero::NonZero<*mut %s>' % (inner_name), 'priv:inner'),
         ]
         if destructor is not None:
             members.append(('bool', 'priv:owned'))
@@ -277,12 +277,12 @@ class RustLibBindingGenerator(BindingGenerator):
         # Implement class trait
         with writer.impl(struct_name, trait_name):
             with writer.function(raw_inner_method_name, ffi_ptr_typename, ['&self'], pub=False):
-                writer.expr('self.inner')
+                writer.expr('*self.inner')
 
         # Implement some specific methods
         with writer.impl(struct_name):
             args = [(ffi_ptr_typename, 'inner')]
-            members = [('inner', 'inner')]
+            members = [('inner', '::core::nonzero::NonZero::new(inner)')]
             if destructor is not None:
                 args.append(('bool', 'owned'))
                 members.append(('owned', 'owned'))
@@ -313,11 +313,18 @@ class RustLibBindingGenerator(BindingGenerator):
     def _generate_tree_function(self, writer, tree, func, **kwargs):
         from bindgen.ast import objects as obj
 
+        def is_nullable(ty):
+            return isinstance(ty, obj.Pointer) and ty.nullable
+
         # Some util functions
         name = camel_case_convert(func.name)
         ret_tyname = tree.resolve_type(func.ret_ty, impl=True)
         ty_params = []
         args = []
+
+        nullable = is_nullable(func.ret_ty) and not isinstance(func, obj.Constructor)
+        if nullable:
+            ret_tyname = 'Option<%s>' % (ret_tyname)
 
         # Build args list
         arg_tys = func.arg_tys
@@ -376,11 +383,30 @@ class RustLibBindingGenerator(BindingGenerator):
 
                 ret = writer.gen.call(call_name, call_args)
 
+                if func.ret_ty == obj.Void:
+                    writer.expr(ret, discard=True)
+                    return
+
                 if isinstance(func.ret_ty, obj.ConvertibleType):
                     writer.declare_var('ret', init=ret)
                     ret = func.ret_ty.convert_from_ffi(writer, 'rust', 'ret', get_inner=get_inner)
 
                 ret = func.ret_ty.transform('rustlib', ret, out=True)
+
+                writer.declare_var('ret', init=ret)
+                ret = 'ret'
+
+                if nullable:
+                    writer.write('if %s.is_null() ' % (ret))
+                    with writer.block():
+                        writer.ret('None')
+
+                if isinstance(func, obj.Constructor):
+                    cls = func.ret_ty.subtype
+
+                    writer.write('if %s.is_null()' % (ret))
+                    with writer.block():
+                        writer.writeln('panic!("%s constructor returned a null pointer!");' % (cls.name))
 
                 if obj.is_class_type(func.ret_ty):
                     cls = func.ret_ty.subtype
@@ -402,5 +428,7 @@ class RustLibBindingGenerator(BindingGenerator):
 
                     ret = writer.gen.call(from_inner, args)
 
-                discard = func.ret_ty == obj.Void
-                writer.expr(ret, discard=discard)
+                if nullable:
+                    ret = 'Some(%s)' % (ret)
+
+                writer.expr(ret)

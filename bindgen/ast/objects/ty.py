@@ -230,12 +230,13 @@ class Ref(_Type):
 ref = Ref
 
 class Pointer(_Type):
-    def __init__(self, subtype, const=False, owned=False):
+    def __init__(self, subtype, const=False, owned=False, nullable=True):
         super().__init__()
 
         self.subtype = subtype
         self.const = const
         self.owned = owned
+        self.nullable = nullable
 
     def flat_name(self):
         name = '%s_ptr' % (self.subtype.flat_name())
