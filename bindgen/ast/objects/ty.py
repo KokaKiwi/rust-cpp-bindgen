@@ -114,6 +114,9 @@ UnsignedInt16 = BuiltinType('uint16_t', _rust_tyname('uint16_t'), 'u16')
 UnsignedInt32 = BuiltinType('uint32_t', _rust_tyname('uint32_t'), 'u32')
 UnsignedInt64 = BuiltinType('uint64_t', _rust_tyname('uint64_t'), 'u64')
 
+Double = BuiltinType('double', _rust_tyname('c_double'), 'f64')
+Float = BuiltinType('float', _rust_tyname('c_float'), 'f32')
+
 class String(ConvertibleType):
     def __init__(self, const=False):
         super().__init__()
