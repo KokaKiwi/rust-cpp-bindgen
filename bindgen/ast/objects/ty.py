@@ -1,3 +1,4 @@
+import enum
 from bindgen.gen import utils as gen_utils
 
 class _Type(object):
@@ -230,13 +231,17 @@ class Ref(_Type):
 ref = Ref
 
 class Pointer(_Type):
-    def __init__(self, subtype, const=False, owned=False, nullable=True):
+    class Null(enum.Enum):
+        option = 1
+        panic = 2
+
+    def __init__(self, subtype, const=False, owned=False, null=Null.option):
         super().__init__()
 
         self.subtype = subtype
         self.const = const
         self.owned = owned
-        self.nullable = nullable
+        self.null = null
 
     def flat_name(self):
         name = '%s_ptr' % (self.subtype.flat_name())

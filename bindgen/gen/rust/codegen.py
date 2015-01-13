@@ -113,6 +113,17 @@ class RustCodeGenerator(CodeGenerator):
 
         return text
 
+    def panic(self, msg=None, *args):
+        text = 'panic!('
+        if msg is not None:
+            text += '"%s"' % (msg)
+
+            for arg in iter(args):
+                text += ', %s' % (arg)
+
+        text += ')'
+        return text
+
     def match(self, expr):
         return 'match %s' % (expr)
 

@@ -313,8 +313,8 @@ class RustLibBindingGenerator(BindingGenerator):
     def _generate_tree_function(self, writer, tree, func, **kwargs):
         from bindgen.ast import objects as obj
 
-        def is_nullable(ty):
-            return isinstance(ty, obj.Pointer) and ty.nullable
+        def is_null(ty, null=None):
+            return isinstance(ty, obj.Pointer) and ty.null == null
 
         # Some util functions
         name = camel_case_convert(func.name)
@@ -322,8 +322,7 @@ class RustLibBindingGenerator(BindingGenerator):
         ty_params = []
         args = []
 
-        nullable = is_nullable(func.ret_ty) and not isinstance(func, obj.Constructor)
-        if nullable:
+        if is_null(func.ret_ty, obj.Pointer.Null.option):
             ret_tyname = 'Option<%s>' % (ret_tyname)
 
         # Build args list
@@ -396,17 +395,15 @@ class RustLibBindingGenerator(BindingGenerator):
                 writer.declare_var('ret', init=ret)
                 ret = 'ret'
 
-                if nullable:
+                if is_null(func.ret_ty, obj.Pointer.Null.option):
                     writer.write('if %s.is_null() ' % (ret))
                     with writer.block():
                         writer.ret('None')
-
-                if isinstance(func, obj.Constructor):
-                    cls = func.ret_ty.subtype
-
+                elif is_null(func.ret_ty, obj.Pointer.Null.panic):
                     writer.write('if %s.is_null()' % (ret))
                     with writer.block():
-                        writer.writeln('panic!("%s constructor returned a null pointer!");' % (cls.name))
+                        name = '::'.join(func.path)
+                        writer.panic('%s returned a null pointer!' % (name))
 
                 if obj.is_class_type(func.ret_ty):
                     cls = func.ret_ty.subtype
@@ -428,7 +425,7 @@ class RustLibBindingGenerator(BindingGenerator):
 
                     ret = writer.gen.call(from_inner, args)
 
-                if nullable:
+                if is_null(func.ret_ty, obj.Pointer.Null.option):
                     ret = 'Some(%s)' % (ret)
 
                 writer.expr(ret)

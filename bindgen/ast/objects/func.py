@@ -1,3 +1,4 @@
+import enum
 from .entity import Entity
 from .ns import Namespace
 from .ty import *
@@ -65,15 +66,20 @@ class StaticMethod(Function):
     pass
 
 class Constructor(StaticMethod):
-    def __init__(self, *arg_tys):
+    class Null(enum.Enum):
+        nothrow = 1
+        catch = 2
+
+    def __init__(self, *arg_tys, null=Null.nothrow):
         Entity.__init__(self)
         self.arg_tys = Function.convert_arg_tys(*arg_tys)
 
         self._call_name = None
+        self.null = null
 
     @property
     def ret_ty(self):
-        return ptr(self.parent)
+        return ptr(self.parent, null=Pointer.Null.panic)
 
 class Destructor(Method):
     pass

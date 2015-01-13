@@ -79,6 +79,9 @@ class RustCodeWriter(CodeWriter):
     def declare_mod(self, *args, **kwargs):
         self.writeln('%s;' % (self.gen.mod(*args, **kwargs)))
 
+    def panic(self, *args, **kwargs):
+        self.writeln('%s;' % (self.gen.panic(*args, **kwargs)))
+
     def simple_impl(self, *args, **kwargs):
         self.writeln('%s {}' % (self.gen.impl(*args, **kwargs)))
 

@@ -82,7 +82,7 @@ class CFFIBindingGenerator(BindingGenerator):
             call_args = [arg_ty.transform('c', arg_name) for (arg_ty, arg_name) in func.arg_tys]
 
             if isinstance(func, obj.Constructor):
-                call_name = 'new %s' % (writer.gen.cpp_name(func.parent.path))
+                ret = self._generate_constructor(writer, func, call_args)
             elif isinstance(func, obj.Destructor):
                 this_arg = call_args[0]
                 writer.delete(this_arg)
@@ -92,14 +92,42 @@ class CFFIBindingGenerator(BindingGenerator):
                 call_args = call_args[1:]
 
                 call_name = '%s->%s' % (this_arg, func.call_name)
+                ret = writer.gen.call(call_name, call_args)
             else:
                 path = func.path[:-1] + [func.call_name]
                 call_name = writer.gen.cpp_name(path)
-
-            ret = writer.gen.call(call_name, call_args)
+                ret = writer.gen.call(call_name, call_args)
 
             if isinstance(func.ret_ty, obj.ConvertibleType):
                 writer.declare_var('auto', 'ret', ret)
                 ret = func.ret_ty.convert_to_ffi(writer, 'c', 'ret')
 
             writer.ret(func.ret_ty.transform('c', ret, out=True))
+
+    def _generate_constructor(self, writer, func, args):
+        from bindgen.ast import objects as obj
+        Null = obj.Constructor.Null
+
+        ctor_name = writer.gen.cpp_name(func.parent.path)
+        ret_ty = func.ret_ty.ffi_name('c')
+
+        if func.null == Null.nothrow:
+            call_name = 'new(std::nothrow) %s' % (ctor_name)
+        else:
+            call_name = 'new %s' % (ctor_name)
+
+        ret = writer.gen.call(call_name, args)
+
+        if func.null == Null.catch:
+            writer.declare_var(ret_ty, 'ret_ctor')
+
+            writer.write('try ')
+            with writer.block():
+                writer.assign_var('ret_ctor', ret)
+            writer.write(' catch(std::exception &) ')
+            with writer.block():
+                writer.assign_var('ret_ctor', 'nullptr')
+
+            ret = 'ret_ctor'
+
+        return ret
