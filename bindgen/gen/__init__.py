@@ -42,6 +42,10 @@ class CodeWriter(object):
 
         self._newline = True
 
+class CodeBuilder(object):
+    def __init__(self, writer):
+        self.writer = writer
+
 class BindingGenerator(object):
     def __init__(self, root):
         self.root = root

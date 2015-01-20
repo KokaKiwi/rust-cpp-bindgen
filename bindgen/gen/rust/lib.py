@@ -3,7 +3,7 @@ from .codegen import RustCodeGenerator
 from .codewriter import RustCodeWriter
 from .tree import make_tree
 from .utils import get_inner, get_inner_static
-from .. import BindingGenerator
+from .. import BindingGenerator, CodeBuilder
 
 def camelcase_to_underscore(name):
     import re
@@ -19,55 +19,23 @@ def underscore_to_camelcase(name):
         return s
     return "".join(title(x) if x else '_' for x in name.split("_"))
 
-class RustLibBindingGenerator(BindingGenerator):
-    def __init__(self, root):
-        super().__init__(root)
+class RustLibCodeBuilder(CodeBuilder):
+    def __init__(self, writer, tree):
+        super().__init__(writer)
 
-        self.gen = RustCodeGenerator(root)
-        self.gen.pub = True
+        self.tree = tree
 
-    def generate(self, dest):
-        tree = make_tree(self.root)
+    def generate_trait(self, item):
+        self._generate_trait(self.writer, item)
 
-        # Generate entry file
-        path = dest / 'lib.rs'
-        self.makedir(path.parent)
+    def generate_enum(self, enum):
+        self._generate_tree_enum(self.writer, self.tree, enum)
 
-        with path.open('w+') as f:
-            writer = RustCodeWriter(self.gen, f)
-            writer.attr('experimental', glob=True)
-            writer.attr('allow', ['unstable'], glob=True)
-            # writer.attr('no_std', glob=True)
-            writer.writeln()
-            writer.extern_crate('core')
-            writer.extern_crate('libc')
-            self._generate_tree_uses(writer, tree)
-            writer.writeln()
-            writer.declare_mod('ffi')
-            writer.declare_mod('traits')
-            self._generate_tree_def(writer, tree)
+    def generate_class(self, cls):
+        self._generate_tree_class(self.writer, self.tree, cls)
 
-        # Generate tree
-        self._generate_tree(tree, dest)
-
-        # Generate traits file
-        path = dest / 'traits.rs'
-        self.makedir(path.parent)
-
-        with path.open('w+') as f:
-            writer = RustCodeWriter(self.gen, f)
-            self._generate_traits(writer, tree)
-
-    def _generate_traits(self, writer, tree):
-        from bindgen.ast import objects as obj
-        from .tree import item_key
-
-        for (name, subtree) in tree.subtrees.items():
-            self._generate_traits(writer, subtree)
-
-        for item in sorted(tree.items, key=item_key):
-            if isinstance(item.item, obj.Class):
-                self._generate_trait(writer, item)
+    def generate_function(self, func, **kwargs):
+        self._generate_tree_function(self.writer, self.tree, func, **kwargs)
 
     def _generate_trait(self, writer, item):
         cls = item.item
@@ -77,50 +45,6 @@ class RustLibBindingGenerator(BindingGenerator):
         name = '::'.join(path)
 
         writer.use([name])
-
-    def _generate_tree_uses(self, writer, tree):
-        # writer.writeln()
-        # writer.use(['', 'core', 'prelude', '*'])
-        pass
-
-    def _generate_tree_def(self, writer, tree):
-        for name in tree.subtrees.keys():
-            writer.declare_mod(name)
-
-    def _generate_tree(self, tree, path):
-        for (name, subtree) in tree.subtrees.items():
-            subpath = path / name
-            self._generate_tree(subtree, subpath)
-
-        if len(tree.items) > 0:
-            if len(tree.subtrees) > 0:
-                fpath = path / 'mod.rs'
-            else:
-                fpath = path.with_suffix('.rs')
-            self.makedir(fpath.parent)
-
-            with fpath.open('w+') as f:
-                writer = RustCodeWriter(self.gen, f)
-                self._generate_tree_uses(writer, tree)
-                self._generate_tree_def(writer, tree)
-                self._generate_tree_items(writer, tree)
-
-    def _generate_tree_items(self, writer, tree):
-        from bindgen.ast import objects as obj
-        from .tree import ty_filter, item_key
-
-        def sorted_filter(_filter, key, items):
-            return sorted(filter(_filter, items), key=key)
-
-        # Write classes
-        for item in sorted_filter(ty_filter(obj.Enum), item_key, tree.items):
-            self._generate_tree_enum(writer, tree, item.item)
-
-        for item in sorted_filter(ty_filter(obj.Class), item_key, tree.items):
-            self._generate_tree_class(writer, tree, item)
-
-        for item in sorted_filter(ty_filter(obj.Function), item_key, tree.items):
-            self._generate_tree_function(writer, tree, item.item, pub=True)
 
     def _generate_tree_enum(self, writer, tree, enum):
         from bindgen.ast import objects as obj
@@ -189,10 +113,9 @@ class RustLibBindingGenerator(BindingGenerator):
 
         writer.simple_impl(enum_name, 'Copy')
 
-    def _generate_tree_class(self, writer, tree, item):
+    def _generate_tree_class(self, writer, tree, cls):
         from bindgen.ast import objects as obj
 
-        cls = item.item
         trait_name = RustLibConstants.TRAIT_NAME.format(name=cls.name)
         struct_name = RustLibConstants.STRUCT_NAME.format(name=cls.name)
         inner_name = RustLibConstants.INNER_NAME.format(name=cls.name)
@@ -202,7 +125,7 @@ class RustLibBindingGenerator(BindingGenerator):
         # Generate enums
         for it in sorted(cls.items, key=lambda item: item.name):
             if isinstance(it, obj.Enum):
-                self._generate_tree_enum(writer, tree, it)
+                self.generate_enum(it)
 
         # Generate inner type
         ffi_typename = '::ffi::%s' % (cls.ffi_name('rust'))
@@ -228,7 +151,9 @@ class RustLibBindingGenerator(BindingGenerator):
             # Class methods
             for it in sorted(cls.items, key=lambda item: item.name):
                 if isinstance(it, obj.Function) and not isinstance(it, (obj.StaticMethod, obj.Destructor)):
-                    self._generate_tree_function(writer, tree, it)
+                    self.generate_function(it)
+                elif isinstance(it, obj.RawFunction):
+                    it.generate(self, 'rust')
 
         # Generate struct
         writer.writeln()
@@ -283,8 +208,11 @@ class RustLibBindingGenerator(BindingGenerator):
                 writer.init_struct(struct_name, members)
 
             # Static methods
-            for it in sorted(filter(lambda item: isinstance(item, obj.StaticMethod), cls.items), key=lambda item: item.name):
-                self._generate_tree_function(writer, tree, it, pub=True)
+            for it in sorted(cls.items, key=lambda item: item.name):
+                if isinstance(it, obj.StaticMethod):
+                    self.generate_function(it, pub=True)
+                elif isinstance(it, obj.RawFunction):
+                    it.generate(self, 'rust', static=True)
 
         # Implement extra traits
         if destructor is not None:
@@ -425,3 +353,111 @@ class RustLibBindingGenerator(BindingGenerator):
                     ret = 'Some(%s)' % (ret)
 
                 writer.expr(ret)
+
+class RustLibBindingGenerator(BindingGenerator):
+    def __init__(self, root):
+        super().__init__(root)
+
+        self.gen = RustCodeGenerator(root)
+        self.gen.pub = True
+
+    def generate(self, dest):
+        tree = make_tree(self.root)
+
+        # Generate entry file
+        path = dest / 'lib.rs'
+        self.makedir(path.parent)
+
+        with path.open('w+') as f:
+            writer = RustCodeWriter(self.gen, f)
+            builder = RustLibCodeBuilder(writer, tree)
+            writer.attr('experimental', glob=True)
+            writer.attr('allow', ['unstable'], glob=True)
+            # writer.attr('no_std', glob=True)
+            writer.writeln()
+            writer.extern_crate('core')
+            writer.extern_crate('libc')
+            self._generate_tree_uses(builder)
+            writer.writeln()
+            writer.declare_mod('ffi')
+            writer.declare_mod('traits')
+            self._generate_tree_def(builder)
+
+        # Generate tree
+        self._generate_tree(tree, dest)
+
+        # Generate traits file
+        path = dest / 'traits.rs'
+        self.makedir(path.parent)
+
+        with path.open('w+') as f:
+            writer = RustCodeWriter(self.gen, f)
+            builder = RustLibCodeBuilder(writer, tree)
+            self._generate_traits(builder, tree)
+
+    def _generate_traits(self, builder, tree):
+        from bindgen.ast import objects as obj
+        from .tree import item_key
+
+        writer = builder.writer
+
+        for (name, subtree) in tree.subtrees.items():
+            self._generate_traits(builder, subtree)
+
+        for item in sorted(tree.items, key=item_key):
+            if isinstance(item.item, obj.Class):
+                builder.generate_trait(item)
+
+    def _generate_tree_uses(self, builder):
+        # writer.writeln()
+        # writer.use(['', 'core', 'prelude', '*'])
+        pass
+
+    def _generate_tree_def(self, builder):
+        writer = builder.writer
+        tree = builder.tree
+
+        for name in tree.subtrees.keys():
+            writer.declare_mod(name)
+
+    def _generate_tree(self, tree, path):
+        for (name, subtree) in tree.subtrees.items():
+            subpath = path / name
+            self._generate_tree(subtree, subpath)
+
+        if len(tree.items) > 0:
+            if len(tree.subtrees) > 0:
+                fpath = path / 'mod.rs'
+            else:
+                fpath = path.with_suffix('.rs')
+            self.makedir(fpath.parent)
+
+            with fpath.open('w+') as f:
+                writer = RustCodeWriter(self.gen, f)
+                builder = RustLibCodeBuilder(writer, tree)
+                self._generate_tree_uses(builder)
+                self._generate_tree_def(builder)
+                self._generate_tree_items(builder)
+
+    def _generate_tree_items(self, builder):
+        from bindgen.ast import objects as obj
+        from .tree import ty_filter, item_key
+
+        writer = builder.writer
+        tree = builder.tree
+
+        def sorted_filter(_filter, key, items):
+            return sorted(filter(_filter, items), key=key)
+
+        # Write classes
+        for item in sorted_filter(ty_filter(obj.Enum), item_key, tree.items):
+            builder.generate_enum(item.item)
+
+        for item in sorted_filter(ty_filter(obj.Class), item_key, tree.items):
+            builder.generate_class(item.item)
+
+        for item in sorted_filter(ty_filter((obj.Function, obj.RawFunction)), item_key, tree.items):
+            if isinstance(item.item, obj.RawFunction):
+                item.item.generate(builder, 'rust')
+            else:
+                builder.generate_function(item.item, pub=True)

@@ -1,6 +1,92 @@
 from .codegen import CCodeGenerator
 from .codewriter import CCodeWriter
-from .. import BindingGenerator
+from .. import BindingGenerator, CodeBuilder
+
+class CFFICodeBuilder(CodeBuilder):
+    def generate_function(self, func):
+        self._generate_function(self.writer, func)
+
+    def generate_constructor(self, func, args):
+        return self._generate_constructor(self.writer, func, args)
+
+    def _generate_function(self, writer, func):
+        from bindgen.ast import objects as obj
+
+        writer.comment(writer.gen.cpp_name(func.path))
+
+        name = writer.gen.c_name(func.path)
+        ret_ty = func.ret_ty.ffi_name('c')
+
+        args = []
+        for (arg_ty, arg_name) in func.arg_tys:
+            if isinstance(arg_ty, obj.ConvertibleType):
+                arg_name = '_' + arg_name
+
+            arg_ty = arg_ty.ffi_name('c')
+
+            args.append((arg_ty, arg_name))
+
+        with writer.function(name, ret_ty, args):
+            # Prepare arguments
+            for (arg_ty, arg_name) in func.arg_tys:
+                if isinstance(arg_ty, obj.ConvertibleType):
+                    value = arg_ty.convert_from_ffi(writer, 'c', '_' + arg_name)
+                    writer.declare_var('auto', arg_name, value)
+
+            # Call function
+            call_args = [arg_ty.transform('c', arg_name) for (arg_ty, arg_name) in func.arg_tys]
+
+            if isinstance(func, obj.Constructor):
+                ret = self.generate_constructor(func, call_args)
+            elif isinstance(func, obj.Destructor):
+                this_arg = call_args[0]
+                writer.delete(this_arg)
+                return
+            elif isinstance(func, obj.Method):
+                this_arg = call_args[0]
+                call_args = call_args[1:]
+
+                call_name = '%s->%s' % (this_arg, func.call_name)
+                ret = writer.gen.call(call_name, call_args)
+            else:
+                path = func.path[:-1] + [func.call_name]
+                call_name = writer.gen.cpp_name(path)
+                ret = writer.gen.call(call_name, call_args)
+
+            if isinstance(func.ret_ty, obj.ConvertibleType):
+                writer.declare_var('auto', 'ret', ret)
+                ret = func.ret_ty.convert_to_ffi(writer, 'c', 'ret')
+
+            writer.ret(func.ret_ty.transform('c', ret, out=True))
+
+    def _generate_constructor(self, writer, func, args):
+        from bindgen.ast import objects as obj
+        Null = obj.Constructor.Null
+
+        ctor_name = func.parent.ffi_name('c')
+        ret_ty = func.ret_ty.ffi_name('c')
+
+        if func.null == Null.nothrow:
+            call_name = 'new(std::nothrow) %s' % (ctor_name)
+        else:
+            call_name = 'new %s' % (ctor_name)
+
+        ret = writer.gen.call(call_name, args)
+
+        if func.null == Null.catch:
+            writer.declare_var(ret_ty, 'ret_ctor')
+
+            writer.write('try ')
+            with writer.block():
+                writer.assign_var('ret_ctor', ret)
+            writer.write(' catch(std::exception &) ')
+            with writer.block():
+                writer.assign_var('ret_ctor', 'nullptr')
+
+            ret = 'ret_ctor'
+
+        return ret
+
 
 class CFFIBindingGenerator(BindingGenerator):
     def generate(self, dest):
@@ -11,10 +97,12 @@ class CFFIBindingGenerator(BindingGenerator):
         with path.open('w+') as f:
             gen = CCodeGenerator(self.root)
             writer = CCodeWriter(gen, f)
-            self._generate(writer)
+            builder = CFFICodeBuilder(writer)
+            self._generate(builder)
 
-    def _generate(self, writer):
+    def _generate(self, builder):
         from bindgen.ast import objects as obj
+        writer = builder.writer
 
         # Includes
         includes = set()
@@ -52,82 +140,7 @@ class CFFIBindingGenerator(BindingGenerator):
         for item in self.root.traverse():
             if isinstance(item, obj.Function):
                 writer.writeln()
-                self._generate_function(writer, item)
-
-    def _generate_function(self, writer, func):
-        from bindgen.ast import objects as obj
-
-        writer.comment(writer.gen.cpp_name(func.path))
-
-        name = writer.gen.c_name(func.path)
-        ret_ty = func.ret_ty.ffi_name('c')
-
-        args = []
-        for (arg_ty, arg_name) in func.arg_tys:
-            if isinstance(arg_ty, obj.ConvertibleType):
-                arg_name = '_' + arg_name
-
-            arg_ty = arg_ty.ffi_name('c')
-
-            args.append((arg_ty, arg_name))
-
-        with writer.function(name, ret_ty, args):
-            # Prepare arguments
-            for (arg_ty, arg_name) in func.arg_tys:
-                if isinstance(arg_ty, obj.ConvertibleType):
-                    value = arg_ty.convert_from_ffi(writer, 'c', '_' + arg_name)
-                    writer.declare_var('auto', arg_name, value)
-
-            # Call function
-            call_args = [arg_ty.transform('c', arg_name) for (arg_ty, arg_name) in func.arg_tys]
-
-            if isinstance(func, obj.Constructor):
-                ret = self._generate_constructor(writer, func, call_args)
-            elif isinstance(func, obj.Destructor):
-                this_arg = call_args[0]
-                writer.delete(this_arg)
-                return
-            elif isinstance(func, obj.Method):
-                this_arg = call_args[0]
-                call_args = call_args[1:]
-
-                call_name = '%s->%s' % (this_arg, func.call_name)
-                ret = writer.gen.call(call_name, call_args)
-            else:
-                path = func.path[:-1] + [func.call_name]
-                call_name = writer.gen.cpp_name(path)
-                ret = writer.gen.call(call_name, call_args)
-
-            if isinstance(func.ret_ty, obj.ConvertibleType):
-                writer.declare_var('auto', 'ret', ret)
-                ret = func.ret_ty.convert_to_ffi(writer, 'c', 'ret')
-
-            writer.ret(func.ret_ty.transform('c', ret, out=True))
-
-    def _generate_constructor(self, writer, func, args):
-        from bindgen.ast import objects as obj
-        Null = obj.Constructor.Null
-
-        ctor_name = writer.gen.cpp_name(func.parent.path)
-        ret_ty = func.ret_ty.ffi_name('c')
-
-        if func.null == Null.nothrow:
-            call_name = 'new(std::nothrow) %s' % (ctor_name)
-        else:
-            call_name = 'new %s' % (ctor_name)
-
-        ret = writer.gen.call(call_name, args)
-
-        if func.null == Null.catch:
-            writer.declare_var(ret_ty, 'ret_ctor')
-
-            writer.write('try ')
-            with writer.block():
-                writer.assign_var('ret_ctor', ret)
-            writer.write(' catch(std::exception &) ')
-            with writer.block():
-                writer.assign_var('ret_ctor', 'nullptr')
-
-            ret = 'ret_ctor'
-
-        return ret
+                builder.generate_function(item)
+            elif isinstance(item, obj.RawFunction):
+                writer.writeln()
+                item.generate(writer, 'c')

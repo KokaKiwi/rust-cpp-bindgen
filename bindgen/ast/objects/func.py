@@ -3,6 +3,28 @@ from .entity import Entity
 from .ns import Namespace
 from .ty import *
 
+class RawFunction(Entity):
+    def __init__(self, cls):
+        super().__init__()
+        self.cls = cls
+        self.methods = self.cls.__dict__
+
+        self.__name__ = self.cls.__name__
+        self.__doc__ = self.cls.__doc__
+
+    def generate(self, builder, lang, **kwargs):
+        meth_name = self.gen_meth_name(lang, **kwargs)
+        meth = self.methods.get(meth_name, None)
+
+        if meth is not None:
+            meth(self, builder, **kwargs)
+
+    def gen_meth_name(self, lang, **kwargs):
+        name = 'generate_%s' % (lang)
+        if kwargs.get('decl'):
+            name += '_decl'
+        return name
+
 class Function(Entity):
     def __init__(self, ret_ty=Void, *arg_tys):
         super().__init__()
@@ -44,6 +66,15 @@ class Function(Entity):
     def with_call_name(self, name):
         self._call_name = name
         return self
+
+class RawMethod(RawFunction):
+    def gen_meth_name(self, lang, **kwargs):
+        name = super().gen_meth_name(lang, **kwargs)
+
+        if kwargs.get('static', False):
+            name += '_static'
+
+        return name
 
 class Method(Function):
     def __init__(self, ret_ty=Void, *arg_tys, const=False):
