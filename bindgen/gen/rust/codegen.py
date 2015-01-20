@@ -163,6 +163,9 @@ class RustCodeGenerator(CodeGenerator):
     def ret(self, expr):
         return 'return %s;' % (expr)
 
+    def cond(self, expr):
+        return 'if %s' % (expr)
+
     def member(self, expr, name, static=False):
         sep = '::' if static else '.'
         return '%s%s%s' % (expr, sep, name)

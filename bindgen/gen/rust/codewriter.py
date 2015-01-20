@@ -64,6 +64,12 @@ class RustCodeWriter(CodeWriter):
             yield
 
     @contextmanager
+    def cond(self, *args, **kwargs):
+        self.write(self.gen.cond(*args, **kwargs))
+        with self.block():
+            yield
+
+    @contextmanager
     def block(self):
         self.writeln('{')
         with self.indent():
