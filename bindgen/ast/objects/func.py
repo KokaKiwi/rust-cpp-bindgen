@@ -32,15 +32,6 @@ class Function(Entity):
         self._call_name = None
 
     @property
-    def namespace(self):
-        current = self.parent
-
-        while not isinstance(current, Namespace):
-            current = current.parent
-
-        return current
-
-    @property
     def call_name(self):
         if self._call_name is not None:
             return self._call_name

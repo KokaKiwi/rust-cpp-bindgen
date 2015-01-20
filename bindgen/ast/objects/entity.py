@@ -12,6 +12,17 @@ class Entity(object):
         yield self
 
     @property
+    def namespace(self):
+        from .ns import Namespace
+
+        current = self.parent
+
+        while not isinstance(current, Namespace):
+            current = current.parent
+
+        return current
+
+    @property
     def path(self):
         path = []
 
