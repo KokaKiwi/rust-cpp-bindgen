@@ -61,6 +61,28 @@ class BoolType(_Type):
 
 Bool = BoolType()
 
+class Option(_Type):
+    def __init__(self, subtype, default):
+        super().__init__()
+
+        self.subtype = subtype
+        self.default = default
+
+    def write_def(self, lang, writer):
+        self.subtype.write_def(lang, writer)
+
+    def flat_name(self):
+        return self.subtype.flat_name()
+
+    def ffi_name(self, lang, **kwargs):
+        return self.subtype.ffi_name(lang, **kwargs)
+
+    def lib_name(self, lang, **kwargs):
+        return self.subtype.lib_name(lang, **kwargs)
+
+    def transform(self, lang, expr, out=False):
+        return self.subtype.transform(lang, expr, out=out)
+
 class BuiltinType(_Type):
     def __init__(self, cpp_name, rust_name, rust_lib_name=None):
         super().__init__()
@@ -183,6 +205,10 @@ class String(ConvertibleType):
             ])
 
         return super().convert_to_ffi(writer, lang, expr, **kwargs)
+
+class OptionString(Option):
+    def __init__(self, *args, **kwargs):
+        super().__init__(String(*args, **kwargs), '""')
 
 class Ref(_Type):
     def __init__(self, subtype, const=False):

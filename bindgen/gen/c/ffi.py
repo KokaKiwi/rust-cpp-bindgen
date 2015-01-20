@@ -15,20 +15,25 @@ class CFFICodeBuilder(CodeBuilder):
         writer.comment(writer.gen.cpp_name(func.path))
 
         name = writer.gen.c_name(func.path)
-        ret_ty = func.ret_ty.ffi_name('c')
+        ret_tyname = func.ret_ty.ffi_name('c')
 
         args = []
         for (arg_ty, arg_name) in func.arg_tys:
+            if isinstance(arg_ty, obj.Option):
+                arg_ty = arg_ty.subtype
+
             if isinstance(arg_ty, obj.ConvertibleType):
                 arg_name = '_' + arg_name
 
             arg_ty = arg_ty.ffi_name('c')
-
             args.append((arg_ty, arg_name))
 
-        with writer.function(name, ret_ty, args):
+        with writer.function(name, ret_tyname, args):
             # Prepare arguments
             for (arg_ty, arg_name) in func.arg_tys:
+                if isinstance(arg_ty, obj.Option):
+                    arg_ty = arg_ty.subtype
+
                 if isinstance(arg_ty, obj.ConvertibleType):
                     value = arg_ty.convert_from_ffi(writer, 'c', '_' + arg_name)
                     writer.declare_var('auto', arg_name, value)

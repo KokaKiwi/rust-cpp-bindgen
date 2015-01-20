@@ -74,6 +74,9 @@ class Method(Function):
 
         self._call_name = None
 
+        if isinstance(self.ret_ty, Option):
+            raise Exception('Optionnable type not allowed for function return type.')
+
     @property
     def arg_tys(self):
         return [(ptr(self.parent, const=self.const), 'inst')] + self._arg_tys

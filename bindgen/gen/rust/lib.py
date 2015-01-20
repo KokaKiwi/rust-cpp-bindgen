@@ -268,8 +268,19 @@ class RustLibCodeBuilder(CodeBuilder):
 
         pub = kwargs.get('pub', False)
 
-        is_null = self.is_null
         # Some util functions
+        is_null = self.is_null
+
+        def get_tyname(ty):
+            if isinstance(ty, obj.Option):
+                tyname = get_tyname(ty.subtype)
+                return 'Option<%s>' % (tyname)
+
+            tyname = tree.resolve_type(ty)
+            if obj.is_class_type(ty):
+                tyname = '&%s' % (tyname)
+            return tyname
+
         name = camel_case_convert(func.name)
         ret_tyname = tree.resolve_type(func.ret_ty, impl=True)
         args = []
@@ -289,10 +300,7 @@ class RustLibCodeBuilder(CodeBuilder):
 
         for (i, (arg_ty, arg_name)) in enumerate(arg_tys):
             arg_name = camel_case_convert(arg_name)
-            arg_tyname = tree.resolve_type(arg_ty)
-
-            if obj.is_class_type(arg_ty):
-                arg_tyname = '&%s' % (arg_tyname)
+            arg_tyname = get_tyname(arg_ty)
 
             args.append((arg_tyname, arg_name))
 
@@ -306,6 +314,12 @@ class RustLibCodeBuilder(CodeBuilder):
                 call_args = []
                 for (arg_ty, arg_name) in arg_tys:
                     arg_name = camel_case_convert(arg_name)
+
+                    if isinstance(arg_ty, obj.Option):
+                        value = '%s.unwrap_or(%s)' % (arg_name, arg_ty.default)
+                        writer.declare_var(arg_name, init=value)
+                        arg_ty = arg_ty.subtype
+
                     if isinstance(arg_ty, obj.ConvertibleType):
                         c_arg_name = 'c_%s' % (arg_name)
 
