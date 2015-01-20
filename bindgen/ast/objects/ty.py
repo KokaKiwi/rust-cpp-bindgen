@@ -175,9 +175,11 @@ class String(ConvertibleType):
             return writer.gen.init_struct(members)
         elif lang == 'rust':
             struct_name = '::ffi::%s' % (self.ffi_name(lang))
+            data_ptr = writer.gen.call(writer.gen.member(expr, 'as_ptr'))
+            data_len = writer.gen.call(writer.gen.member(expr, 'len'))
             return writer.gen.init_struct(struct_name, [
-                ('data', writer.gen.call(writer.gen.member(expr, 'as_ptr'))),
-                ('length', writer.gen.call(writer.gen.member(expr, 'len'))),
+                ('data', writer.gen.cast(data_ptr, ptr(Char, const=self.const).ffi_name(lang))),
+                ('length', writer.gen.cast(data_len, SizeTy.ffi_name(lang))),
             ])
 
         return super().convert_to_ffi(writer, lang, expr, **kwargs)
