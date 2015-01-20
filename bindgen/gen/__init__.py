@@ -1,3 +1,4 @@
+from . import utils as gen_utils
 from contextlib import contextmanager
 
 class CodeGenerator(object):
@@ -45,6 +46,12 @@ class CodeWriter(object):
 class CodeBuilder(object):
     def __init__(self, writer):
         self.writer = writer
+
+    def c_name(self, path):
+        return gen_utils.c_name(path)
+
+    def cpp_name(self, path):
+        return gen_utils.cpp_name(path)
 
 class BindingGenerator(object):
     def __init__(self, root):
