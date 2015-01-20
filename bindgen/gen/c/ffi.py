@@ -143,4 +143,4 @@ class CFFIBindingGenerator(BindingGenerator):
                 builder.generate_function(item)
             elif isinstance(item, obj.RawFunction):
                 writer.writeln()
-                item.generate(writer, 'c')
+                item.generate(builder, 'c')
