@@ -3,21 +3,19 @@ from .entity import Entity
 from .ns import Namespace
 from .ty import *
 
+def raw(cls):
+    func = cls()
+    func.name = cls.__name__
+
+    return func
+
 class RawFunction(Entity):
-    def __init__(self, cls):
-        super().__init__()
-        self.cls = cls
-        self.methods = self.cls.__dict__
-
-        self.__name__ = self.cls.__name__
-        self.__doc__ = self.cls.__doc__
-
     def generate(self, builder, lang, **kwargs):
         meth_name = self.gen_meth_name(lang, **kwargs)
-        meth = self.methods.get(meth_name, None)
+        meth = getattr(self, meth_name, None)
 
         if meth is not None:
-            meth(self, builder, **kwargs)
+            meth(builder, **kwargs)
 
     def gen_meth_name(self, lang, **kwargs):
         name = 'generate_%s' % (lang)
