@@ -8,6 +8,7 @@ class Class(Module, _Type):
         _Type.__init__(self)
 
         self.name = name
+        self.cpp_name = self.name
         self.bases = list(bases)
         self.upclasses = self.bases
         self.downclasses = list()
@@ -50,6 +51,12 @@ class Class(Module, _Type):
 
         return ptr(self)
 
+    def add_body_item(self, name, item):
+        if name == '_realname_':
+            self.cpp_name = item
+        else:
+            super().add_body_item(name, item)
+
     def all_downclasses(self):
         for down in self.downclasses:
             yield down
@@ -77,7 +84,9 @@ class Class(Module, _Type):
 
     def ffi_name(self, lang, **kwargs):
         if lang == 'c':
-            return gen_utils.cpp_name(self.path)
+            path = self.path
+            path[-1] = self.cpp_name
+            return gen_utils.cpp_name(path)
         elif lang == 'rust':
             path = kwargs.get('path', []) + [self.flat_name()]
             return '::'.join(path)
