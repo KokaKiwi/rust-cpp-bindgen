@@ -37,6 +37,12 @@ class RustLibCodeBuilder(CodeBuilder):
     def generate_function(self, func, **kwargs):
         self._generate_tree_function(self.writer, self.tree, func, **kwargs)
 
+    def camelcase_to_underscore(self, name):
+        return camelcase_to_underscore(name)
+
+    def underscore_to_camelcase(self, name):
+        return underscore_to_camelcase(name)
+
     def _generate_trait(self, writer, item):
         cls = item.item
         trait_name = RustLibConstants.TRAIT_NAME.format(name=cls.name)
@@ -231,16 +237,20 @@ class RustLibCodeBuilder(CodeBuilder):
         else:
             writer.simple_impl(struct_name, 'Copy')
 
+    def is_null(self, ty, null=None):
+        from bindgen.ast import objects as obj
+
+        return isinstance(ty, obj.Pointer) and ty.null == null
+
     def _generate_tree_function(self, writer, tree, func, **kwargs):
         from bindgen.ast import objects as obj
 
-        def is_null(ty, null=None):
-            return isinstance(ty, obj.Pointer) and ty.null == null
+        pub = kwargs.get('pub', False)
 
+        is_null = self.is_null
         # Some util functions
         name = camel_case_convert(func.name)
         ret_tyname = tree.resolve_type(func.ret_ty, impl=True)
-        ty_params = []
         args = []
 
         if is_null(func.ret_ty, obj.Pointer.Null.option):
@@ -270,7 +280,7 @@ class RustLibCodeBuilder(CodeBuilder):
 
         # Write function
         writer.writeln()
-        with writer.function(name, ret_tyname, args, ty_params=ty_params, pub=kwargs.get('pub', False)):
+        with writer.function(name, ret_tyname, args, pub=pub):
             with writer.unsafe():
                 call_args = []
                 for (arg_ty, arg_name) in arg_tys:
