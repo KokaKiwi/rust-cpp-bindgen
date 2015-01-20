@@ -37,11 +37,17 @@ class RustLibCodeBuilder(CodeBuilder):
     def generate_function(self, func, **kwargs):
         self._generate_tree_function(self.writer, self.tree, func, **kwargs)
 
-    def camelcase_to_underscore(self, name):
-        return camelcase_to_underscore(name)
+    def camelcase_to_underscore(self, *args, **kwargs):
+        return camelcase_to_underscore(*args, **kwargs)
 
-    def underscore_to_camelcase(self, name):
-        return underscore_to_camelcase(name)
+    def underscore_to_camelcase(self, *args, **kwargs):
+        return underscore_to_camelcase(*args, **kwargs)
+
+    def get_inner(self, *args, **kwargs):
+        return get_inner(*args, **kwargs)
+
+    def get_inner_static(self, *args, **kwargs):
+        return get_inner_static(*args, **kwargs)
 
     def _generate_trait(self, writer, item):
         cls = item.item
@@ -159,6 +165,7 @@ class RustLibCodeBuilder(CodeBuilder):
                 if isinstance(it, obj.Function) and not isinstance(it, (obj.StaticMethod, obj.Destructor)):
                     self.generate_function(it)
                 elif isinstance(it, obj.RawFunction):
+                    writer.writeln()
                     it.generate(self, 'rust')
 
         # Generate struct
@@ -218,6 +225,7 @@ class RustLibCodeBuilder(CodeBuilder):
                 if isinstance(it, obj.StaticMethod):
                     self.generate_function(it, pub=True)
                 elif isinstance(it, obj.RawFunction):
+                    writer.writeln()
                     it.generate(self, 'rust', static=True)
 
         # Implement extra traits
@@ -241,6 +249,19 @@ class RustLibCodeBuilder(CodeBuilder):
         from bindgen.ast import objects as obj
 
         return isinstance(ty, obj.Pointer) and ty.null == null
+
+    def check_ptr(self, ty, expr, name):
+        from bindgen.ast import objects as obj
+
+        writer = self.writer
+
+        cond = '%s.is_null()' % (expr)
+        if self.is_null(ty, obj.Pointer.Null.option):
+            with writer.cond(cond):
+                writer.ret('None')
+        elif self.is_null(ty, obj.Pointer.Null.panic):
+            with writer.cond(cond):
+                writer.panic('%s returned a null pointer!' % (name))
 
     def _generate_tree_function(self, writer, tree, func, **kwargs):
         from bindgen.ast import objects as obj
@@ -301,9 +322,9 @@ class RustLibCodeBuilder(CodeBuilder):
 
                 if isinstance(func, obj.Method):
                     cls = func.parent
-                    ffi_typename = '::ffi::%s' % (cls.ffi_name('rust'))
                     self_arg = get_inner_proxy(writer, obj.Pointer(cls), 'self')
                     if func.const:
+                        ffi_typename = '::ffi::%s' % (cls.ffi_name('rust'))
                         self_arg = writer.gen.cast(self_arg, '*const %s' % (ffi_typename))
                     call_args.insert(0, self_arg)
 
@@ -329,23 +350,15 @@ class RustLibCodeBuilder(CodeBuilder):
                 writer.declare_var('ret', init=ret)
                 ret = 'ret'
 
-                if is_null(func.ret_ty, obj.Pointer.Null.option):
-                    writer.write('if %s.is_null() ' % (ret))
-                    with writer.block():
-                        writer.ret('None')
-                elif is_null(func.ret_ty, obj.Pointer.Null.panic):
-                    writer.write('if %s.is_null()' % (ret))
-                    with writer.block():
-                        name = '::'.join(func.path)
-                        writer.panic('%s returned a null pointer!' % (name))
+                self.check_ptr(func.ret_ty, ret, '::'.join(func.path))
 
                 if obj.is_class_type(func.ret_ty):
                     cls = func.ret_ty.subtype
 
                     name = RustLibConstants.STRUCT_NAME.format(name=tree.resolve_type(cls))
-                    ret_ffi_typename = '::ffi::%s' % (cls.ffi_name('rust'))
                     from_inner = writer.gen.member(name, 'from_inner', static=True)
                     if func.ret_ty.const:
+                        ret_ffi_typename = '::ffi::%s' % (cls.ffi_name('rust'))
                         ret = writer.gen.cast(ret, '*mut %s' % (ret_ffi_typename))
 
                     args = [ret]
@@ -468,6 +481,7 @@ class RustLibBindingGenerator(BindingGenerator):
 
         for item in sorted_filter(ty_filter((obj.Function, obj.RawFunction)), item_key, tree.items):
             if isinstance(item.item, obj.RawFunction):
+                writer.writeln()
                 item.item.generate(builder, 'rust')
             else:
                 builder.generate_function(item.item, pub=True)
