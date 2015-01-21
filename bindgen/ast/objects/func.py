@@ -56,6 +56,8 @@ class Function(Entity):
         self._call_name = name
         return self
 
+fn = Function
+
 class RawMethod(RawFunction):
     def gen_meth_name(self, lang, **kwargs):
         name = super().gen_meth_name(lang, **kwargs)
@@ -85,6 +87,8 @@ class Method(Function):
     def args_tys(self, value):
         self._arg_tys = value
 
+meth = Method
+
 class StaticMethod(Function):
     pass
 
@@ -104,5 +108,9 @@ class Constructor(StaticMethod):
     def ret_ty(self):
         return ptr(self.parent, null=Pointer.Null.panic)
 
+ctor = Constructor
+
 class Destructor(Method):
     pass
+
+dtor = Destructor
