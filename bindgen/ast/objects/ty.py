@@ -62,7 +62,8 @@ class BoolType(_Type):
 Bool = BoolType()
 
 class Option(_Type):
-    def __init__(self, subtype, default):
+    # A None default means only something when subtype is a class.
+    def __init__(self, subtype, default=None):
         super().__init__()
 
         self.subtype = subtype
@@ -289,3 +290,9 @@ class Pointer(_Type):
         return super().lib_name(lang, **kwargs)
 
 ptr = Pointer
+
+# Describe a pointer which can't be null
+# /!\ USE IT WISELY /!\
+def sptr(*args, **kwargs):
+    return ptr(*args, null=None, **kwargs)
+

@@ -315,7 +315,7 @@ class RustLibCodeBuilder(CodeBuilder):
                 for (arg_ty, arg_name) in arg_tys:
                     arg_name = camel_case_convert(arg_name)
 
-                    if isinstance(arg_ty, obj.Option):
+                    if isinstance(arg_ty, obj.Option) and not obj.is_class_type(arg_ty.subtype):
                         value = '%s.unwrap_or(%s)' % (arg_name, arg_ty.default)
                         writer.declare_var(arg_name, init=value)
                         arg_ty = arg_ty.subtype
@@ -329,6 +329,14 @@ class RustLibCodeBuilder(CodeBuilder):
                         call_args.append(c_arg_name)
                     elif obj.is_class_type(arg_ty):
                         call_args.append(get_inner_proxy(writer, arg_ty, arg_name))
+                    elif isinstance(arg_ty, obj.Option) and obj.is_class_type(arg_ty.subtype):
+                        inner = get_inner_proxy(writer, arg_ty.subtype, arg_name)
+                        if arg_ty.subtype.const:
+                            null = '::std::ptr::null()'
+                        else:
+                            null = '::std::ptr::null_mut()'
+                        arg = '%s.map(|%s| %s).unwrap_or(%s)' % (arg_name, arg_name, inner, null)
+                        call_args.append(arg)
                     else:
                         call_args.append(arg_name)
 

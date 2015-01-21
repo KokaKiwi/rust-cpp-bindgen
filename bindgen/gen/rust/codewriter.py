@@ -66,6 +66,7 @@ class RustCodeWriter(CodeWriter):
     @contextmanager
     def cond(self, *args, **kwargs):
         self.write(self.gen.cond(*args, **kwargs))
+        self.write(' ')
         with self.block():
             yield
 

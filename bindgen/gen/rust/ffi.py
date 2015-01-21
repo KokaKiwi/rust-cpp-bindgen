@@ -62,6 +62,9 @@ class RustFFICodeBuilder(CodeBuilder):
 
         args = []
         for (arg_ty, arg_name) in func.arg_tys:
+            if isinstance(arg_ty, obj.Option):
+                arg_ty = arg_ty.subtype
+
             if arg_ty == obj.Bool:
                 arg_ty = 'bool'
             else:
