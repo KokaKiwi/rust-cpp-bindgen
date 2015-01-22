@@ -62,7 +62,11 @@ class CFFICodeBuilder(CodeBuilder):
                 writer.declare_var('auto', 'ret', ret)
                 ret = func.ret_ty.convert_to_ffi(writer, 'c', 'ret')
 
-            writer.ret(func.ret_ty.transform('c', ret, out=True))
+            ret = func.ret_ty.transform('c', ret, out=True)
+            if func.ret_ty != obj.Void:
+                writer.ret(ret)
+            else:
+                writer.writeln('%s;' % (ret))
 
     def _generate_constructor(self, writer, func, args):
         from bindgen.ast import objects as obj
