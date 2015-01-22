@@ -25,12 +25,12 @@ class ModTree(object):
         from . import RustLibConstants
         from bindgen.ast import objects as obj
 
-        if obj.is_class_type(ty):
+        if obj.is_class_container(ty):
             name = self.resolve_type(ty.subtype)
             if impl:
                 fmt = RustLibConstants.STRUCT_NAME
             else:
-                fmt = RustLibConstants.TRAIT_NAME
+                fmt = RustLibConstants.INNER_TRAIT_NAME
             return fmt.format(name=name)
         return ty.lib_name('rust', tree=self)
 

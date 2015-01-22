@@ -11,8 +11,6 @@ def camelcase_to_underscore(name):
     s1 = re.sub('(.)([A-Z][a-z]+)', r'\1_\2', name)
     return re.sub('([a-z0-9])([A-Z])', r'\1_\2', s1).lower()
 
-camel_case_convert = camelcase_to_underscore
-
 def underscore_to_camelcase(name):
     def title(s):
         s = s[0].upper() + s[1:]
@@ -51,12 +49,14 @@ class RustLibCodeBuilder(CodeBuilder):
 
     def _generate_trait(self, writer, item):
         cls = item.item
-        trait_name = RustLibConstants.TRAIT_NAME.format(name=cls.name)
 
-        path = [''] + item.path + [trait_name]
-        name = '::'.join(path)
+        inner_trait_name = RustLibConstants.INNER_TRAIT_NAME.format(name=cls.name)
+        ext_trait_name = RustLibConstants.EXT_TRAIT_NAME.format(name=cls.name)
 
-        writer.use([name])
+        base_path = [''] + item.path
+
+        writer.use(base_path + [inner_trait_name])
+        writer.use(base_path + [ext_trait_name])
 
     def _generate_tree_enum(self, writer, tree, enum):
         from bindgen.ast import objects as obj
@@ -128,7 +128,8 @@ class RustLibCodeBuilder(CodeBuilder):
     def _generate_tree_class(self, writer, tree, cls):
         from bindgen.ast import objects as obj
 
-        trait_name = RustLibConstants.TRAIT_NAME.format(name=cls.name)
+        inner_trait_name = RustLibConstants.INNER_TRAIT_NAME.format(name=cls.name)
+        ext_trait_name = RustLibConstants.EXT_TRAIT_NAME.format(name=cls.name)
         struct_name = RustLibConstants.STRUCT_NAME.format(name=cls.name)
         inner_name = RustLibConstants.INNER_NAME.format(name=cls.name)
 
@@ -145,7 +146,7 @@ class RustLibCodeBuilder(CodeBuilder):
 
         writer.typedef(inner_name, ffi_typename)
 
-        # Generate trait
+        # Generate traits
         def base_cmp(base):
             def _cmp(item):
                 return item.item == base
@@ -153,20 +154,25 @@ class RustLibCodeBuilder(CodeBuilder):
         bases = [tree.root.find(base_cmp(base)) for base in cls.bases]
         bases = [[''] + base.fullpath for base in bases]
         bases = ['::'.join(base) for base in bases]
-        bases = [RustLibConstants.TRAIT_NAME.format(name=base) for base in bases]
+        bases = [RustLibConstants.INNER_TRAIT_NAME.format(name=base) for base in bases]
 
+        # Generate inner trait
         writer.writeln()
-        with writer.trait(trait_name, bases):
-            writer.attr('allow', ['non_snake_case'])
+        with writer.trait(inner_trait_name, bases):
             writer.declare_function('inner', ffi_ptr_typename, ['&self'], pub=False)
 
-            # Class methods
+        # Generate ext trait
+        writer.writeln()
+        with writer.trait(ext_trait_name, [inner_trait_name]):
             for it in sorted(cls.items, key=lambda item: item.name):
                 if isinstance(it, obj.Function) and not isinstance(it, (obj.StaticMethod, obj.Destructor)):
                     self.generate_function(it)
                 elif isinstance(it, obj.RawFunction):
                     writer.writeln()
                     it.generate(self, 'rust')
+
+        # Impl ext trait for all inner trait
+        writer.writeln('impl<T> %s for T where T: %s {}' % (ext_trait_name, inner_trait_name))
 
         # Generate struct
         writer.writeln()
@@ -196,7 +202,7 @@ class RustLibCodeBuilder(CodeBuilder):
         for base in bases:
             base_path = [''] + base.fullpath
             base_name = '::'.join(base_path)
-            base_name = RustLibConstants.TRAIT_NAME.format(name=base_name)
+            base_name = RustLibConstants.INNER_TRAIT_NAME.format(name=base_name)
 
             base_ffi_typename = '::ffi::%s' % (base.item.ffi_name('rust'))
 
@@ -206,7 +212,7 @@ class RustLibCodeBuilder(CodeBuilder):
                         writer.expr(writer.gen.call('::core::mem::transmute', ['self.inner']))
 
         # Implement class trait
-        with writer.impl(struct_name, trait_name):
+        with writer.impl(struct_name, inner_trait_name):
             with writer.function('inner', ffi_ptr_typename, ['&self'], pub=False):
                 writer.expr('*self.inner')
 
@@ -271,18 +277,12 @@ class RustLibCodeBuilder(CodeBuilder):
         # Some util functions
         is_null = self.is_null
 
-        def get_tyname(ty):
-            if isinstance(ty, obj.Option):
-                tyname = get_tyname(ty.subtype)
-                return 'Option<%s>' % (tyname)
+        def get_inner_proxy(*args, **kwargs):
+            return get_inner(tree, *args, **kwargs)
 
-            tyname = tree.resolve_type(ty)
-            if obj.is_class_type(ty):
-                tyname = '&%s' % (tyname)
-            return tyname
-
-        name = camel_case_convert(func.name)
+        name = camelcase_to_underscore(func.name)
         ret_tyname = tree.resolve_type(func.ret_ty, impl=True)
+        ty_params = []
         args = []
 
         if is_null(func.ret_ty, obj.Pointer.Null.option):
@@ -298,22 +298,54 @@ class RustLibCodeBuilder(CodeBuilder):
             args.append(arg)
             arg_tys = arg_tys[1:]
 
+        def get_tyname(ty):
+            if isinstance(ty, obj.Option):
+                tyname = get_tyname(ty.subtype)
+                return 'Option<%s>' % (tyname)
+
+            return tree.resolve_type(ty)
+
+        def get_arg_tyname(ty, name):
+            if isinstance(ty, obj.Option):
+                tyname = get_arg_tyname(ty.subtype, name)
+                return 'Option<%s>' % (tyname)
+
+            return name
+
         for (i, (arg_ty, arg_name)) in enumerate(arg_tys):
-            arg_name = camel_case_convert(arg_name)
-            arg_tyname = get_tyname(arg_ty)
+            arg_name = camelcase_to_underscore(arg_name)
+
+            if obj.is_class_type(arg_ty):
+                cls = obj.get_class_type(arg_ty)
+                cls_ptr = obj.get_class_ptr(arg_ty)
+                cls_ref = obj.get_class_ref(arg_ty)
+                cls_container = cls_ptr if cls_ptr is not None else cls_ref
+                cls_tyname = tree.resolve_type(obj.Pointer(cls))
+
+                param_name = 'A%d' % (i + 1)
+                ty_params.append((param_name, cls_tyname))
+
+                arg_tyname = param_name
+                if (cls_ptr is not None and not cls_ptr.owned) or cls_ref is not None:
+                    # if destructor is not None:
+                    if cls_container.const:
+                        ref_str = '&'
+                    else:
+                        ref_str = '&mut '
+                    arg_tyname = '%s%s' % (ref_str, arg_tyname)
+                arg_tyname = get_arg_tyname(arg_ty, arg_tyname)
+            else:
+                arg_tyname = get_tyname(arg_ty)
 
             args.append((arg_tyname, arg_name))
 
-        def get_inner_proxy(*args, **kwargs):
-            return get_inner(tree, *args, **kwargs)
-
         # Write function
         writer.writeln()
-        with writer.function(name, ret_tyname, args, pub=pub):
+        with writer.function(name, ret_tyname, args, pub=pub, ty_params=ty_params):
             with writer.unsafe():
                 call_args = []
                 for (arg_ty, arg_name) in arg_tys:
-                    arg_name = camel_case_convert(arg_name)
+                    arg_name = camelcase_to_underscore(arg_name)
 
                     if isinstance(arg_ty, obj.Option) and not obj.is_class_type(arg_ty.subtype):
                         value = '%s.unwrap_or(%s)' % (arg_name, arg_ty.default)
@@ -327,9 +359,9 @@ class RustLibCodeBuilder(CodeBuilder):
                         writer.declare_var(c_arg_name, init=value)
 
                         call_args.append(c_arg_name)
-                    elif obj.is_class_type(arg_ty):
+                    elif isinstance(arg_ty, (obj.Pointer, obj.Ref)) and obj.is_class_type(arg_ty.subtype):
                         call_args.append(get_inner_proxy(writer, arg_ty, arg_name))
-                    elif isinstance(arg_ty, obj.Option) and obj.is_class_type(arg_ty.subtype):
+                    elif isinstance(arg_ty, obj.Option) and obj.is_class_container(arg_ty.subtype):
                         inner = get_inner_proxy(writer, arg_ty.subtype, arg_name)
                         if arg_ty.subtype.const:
                             null = '::std::ptr::null()'
@@ -359,8 +391,19 @@ class RustLibCodeBuilder(CodeBuilder):
 
                 ret = writer.gen.call(call_name, call_args)
 
+                # Forget all moved objects.
+                def forget():
+                    for (arg_ty, arg_name) in arg_tys:
+                        cls_ptr = obj.get_class_ptr(arg_ty)
+                        arg_name = camelcase_to_underscore(arg_name)
+
+                        if cls_ptr is not None and cls_ptr.owned:
+                            writer.call('::std::mem::forget', [arg_name])
+
+                # Do final transforms to return value
                 if func.ret_ty == obj.Void:
                     writer.expr(ret, discard=True)
+                    forget()
                     return
 
                 if isinstance(func.ret_ty, obj.ConvertibleType):
@@ -371,6 +414,8 @@ class RustLibCodeBuilder(CodeBuilder):
 
                 writer.declare_var('ret', init=ret)
                 ret = 'ret'
+
+                forget()
 
                 self.check_ptr(func.ret_ty, ret, '::'.join(func.path))
 

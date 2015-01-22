@@ -33,7 +33,15 @@ class RustCodeGenerator(CodeGenerator):
         text += 'fn %s' % (name)
         ty_params = kwargs.get('ty_params')
         if ty_params is not None and len(ty_params) > 0:
-            text += '<%s>' % (', '.join(ty_params))
+            params = []
+            for ty_param in ty_params:
+                if isinstance(ty_param, tuple):
+                    (name, bases) = ty_param
+                    if isinstance(bases, list):
+                        bases = ' + '.join(bases)
+                    ty_param = '%s: %s' % (name, bases)
+                params.append(ty_param)
+            text += '<%s>' % (', '.join(params))
         text += '('
         for (i, arg) in enumerate(args):
             if isinstance(arg, tuple):

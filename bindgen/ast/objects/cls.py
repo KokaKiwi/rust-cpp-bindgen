@@ -103,7 +103,7 @@ class Class(Module, _Type):
             name = '::'.join(path)
 
             if kwargs.get('trait', False):
-                name = RustLibConstants.TRAIT_NAME.format(name=name)
+                name = RustLibConstants.INNER_TRAIT_NAME.format(name=name)
             elif kwargs.get('impl', False):
                 name = RustLibConstants.STRUCT_NAME.format(name=name)
             elif kwargs.get('inner', False):

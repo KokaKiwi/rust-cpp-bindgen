@@ -1,6 +1,7 @@
 
 class RustLibConstants:
-    TRAIT_NAME = '{name}Ext'
+    INNER_TRAIT_NAME = '{name}Obj'
+    EXT_TRAIT_NAME = '{name}Ext'
     STRUCT_NAME = '{name}'
     INNER_NAME = '{name}Inner'
 
