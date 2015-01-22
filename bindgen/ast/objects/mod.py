@@ -75,6 +75,17 @@ class Module(Entity):
 
         raise KeyError(name)
 
+    def __setitem__(self, name, value):
+        indexes_to_delete = []
+        for (i, item) in enumerate(self.items):
+            if getattr(item, 'name') == name:
+                indexes_to_delete.append(i)
+
+        for idx in reversed(indexes_to_delete):
+            del self.items[idx]
+
+        self.add_body_item(name, value)
+
     def __iter__(self):
         return iter(self.items)
 
