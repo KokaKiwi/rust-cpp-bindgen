@@ -36,10 +36,17 @@ class RustCodeGenerator(CodeGenerator):
             params = []
             for ty_param in ty_params:
                 if isinstance(ty_param, tuple):
-                    (name, bases) = ty_param
+                    default = None
+                    if len(ty_param) == 2:
+                        (name, bases) = ty_param
+                    elif len(ty_param) == 3:
+                        (name, bases, default) = ty_param
+
                     if isinstance(bases, list):
                         bases = ' + '.join(bases)
                     ty_param = '%s: %s' % (name, bases)
+                    if default is not None:
+                        ty_param += ' = %s' % (default)
                 params.append(ty_param)
             text += '<%s>' % (', '.join(params))
         text += '('

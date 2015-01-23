@@ -342,9 +342,10 @@ class RustLibCodeBuilder(CodeBuilder):
                 cls_ref = obj.get_class_ref(arg_ty)
                 cls_container = cls_ptr if cls_ptr is not None else cls_ref
                 cls_tyname = tree.resolve_type(obj.Pointer(cls))
+                cls_impl_tyname = tree.resolve_type(obj.Pointer(cls), impl=True)
 
                 param_name = 'A%d' % (i + 1)
-                ty_params.append((param_name, cls_tyname))
+                ty_params.append((param_name, cls_tyname, cls_impl_tyname))
 
                 arg_tyname = param_name
                 if (cls_ptr is not None and not cls_ptr.owned) or cls_ref is not None:
