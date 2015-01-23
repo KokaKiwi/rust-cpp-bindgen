@@ -21,16 +21,17 @@ class ModTree(object):
                 return item
         return None
 
-    def resolve_type(self, ty, impl=False):
+    def resolve_type(self, ty, impl=False, fmt=None):
         from . import RustLibConstants
         from bindgen.ast import objects as obj
 
         if obj.is_class_container(ty):
             name = self.resolve_type(ty.subtype)
-            if impl:
-                fmt = RustLibConstants.STRUCT_NAME
-            else:
-                fmt = RustLibConstants.INNER_TRAIT_NAME
+            if fmt is None:
+                if impl:
+                    fmt = RustLibConstants.STRUCT_NAME
+                else:
+                    fmt = RustLibConstants.INNER_TRAIT_NAME
             return fmt.format(name=name)
         return ty.lib_name('rust', tree=self)
 

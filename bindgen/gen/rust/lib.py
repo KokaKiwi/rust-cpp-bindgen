@@ -51,11 +51,13 @@ class RustLibCodeBuilder(CodeBuilder):
         cls = item.item
 
         inner_trait_name = RustLibConstants.INNER_TRAIT_NAME.format(name=cls.name)
+        owned_trait_name = RustLibConstants.OWNED_TRAIT_NAME.format(name=cls.name)
         ext_trait_name = RustLibConstants.EXT_TRAIT_NAME.format(name=cls.name)
 
         base_path = [''] + item.path
 
         writer.use(base_path + [inner_trait_name])
+        writer.use(base_path + [owned_trait_name])
         writer.use(base_path + [ext_trait_name])
 
     def _generate_tree_enum(self, writer, tree, enum):
@@ -130,6 +132,7 @@ class RustLibCodeBuilder(CodeBuilder):
 
         inner_trait_name = RustLibConstants.INNER_TRAIT_NAME.format(name=cls.name)
         ext_trait_name = RustLibConstants.EXT_TRAIT_NAME.format(name=cls.name)
+        owned_trait_name = RustLibConstants.OWNED_TRAIT_NAME.format(name=cls.name)
         struct_name = RustLibConstants.STRUCT_NAME.format(name=cls.name)
         inner_name = RustLibConstants.INNER_NAME.format(name=cls.name)
 
@@ -159,7 +162,20 @@ class RustLibCodeBuilder(CodeBuilder):
         # Generate inner trait
         writer.writeln()
         with writer.trait(inner_trait_name, bases):
-            writer.declare_function('inner', ffi_ptr_typename, ['&self'], pub=False)
+            writer.declare_function(RustLibConstants.GET_INNER_METHOD_NAME, ffi_ptr_typename, ['&self'], pub=False, unsafe=True)
+
+        # Generate inner owned trait
+        writer.writeln()
+        with writer.trait(owned_trait_name, [inner_trait_name, '::core::marker::Sized']):
+            writer.attr('inline', ['always'])
+            with writer.function(RustLibConstants.MOVE_INNER_METHOD_NAME, ffi_ptr_typename, ['self'], pub=False, unsafe=True):
+                get_inner_meth = writer.gen.member(inner_trait_name, RustLibConstants.GET_INNER_METHOD_NAME, static=True)
+                inner = writer.gen.call(get_inner_meth, ['&self'])
+                writer.declare_var('inner', init=inner)
+                writer.call('::core::mem::forget', ['self'])
+                writer.ret('inner')
+
+        writer.writeln('impl<T> %s for T where T: %s + ::core::marker::Sized {}' % (owned_trait_name, inner_trait_name))
 
         # Generate ext trait
         writer.writeln()
@@ -207,13 +223,15 @@ class RustLibCodeBuilder(CodeBuilder):
             base_ffi_typename = '::ffi::%s' % (base.item.ffi_name('rust'))
 
             with writer.impl(struct_name, base_name):
-                with writer.function('inner', '*mut %s' % (base_ffi_typename), ['&self'], pub=False):
+                writer.attr('inline', ['always'])
+                with writer.function(RustLibConstants.GET_INNER_METHOD_NAME, '*mut %s' % (base_ffi_typename), ['&self'], pub=False):
                     with writer.unsafe():
                         writer.expr(writer.gen.call('::core::mem::transmute', ['self.inner']))
 
         # Implement class trait
         with writer.impl(struct_name, inner_trait_name):
-            with writer.function('inner', ffi_ptr_typename, ['&self'], pub=False):
+            writer.attr('inline', ['always'])
+            with writer.function(RustLibConstants.GET_INNER_METHOD_NAME, ffi_ptr_typename, ['&self'], pub=False):
                 writer.expr('*self.inner')
 
         # Implement some specific methods
@@ -223,6 +241,8 @@ class RustLibCodeBuilder(CodeBuilder):
             if destructor is not None:
                 args.append(('bool', 'owned'))
                 members.append(('owned', 'owned'))
+
+            writer.attr('inline', ['always'])
             with writer.function('from_inner', struct_name, args, unsafe=True):
                 writer.init_struct(struct_name, members)
 
@@ -237,6 +257,7 @@ class RustLibCodeBuilder(CodeBuilder):
         # Implement extra traits
         if destructor is not None:
             with writer.impl(struct_name, 'Drop'):
+                writer.attr('inline', ['always'])
                 with writer.function('drop', args=['&mut self'], pub=False):
                     cls_path = destructor.path[:-1]
                     ffi_name = '::ffi' + '%s_%s' % ('::'.join(cls_path), destructor.name)
@@ -391,19 +412,9 @@ class RustLibCodeBuilder(CodeBuilder):
 
                 ret = writer.gen.call(call_name, call_args)
 
-                # Forget all moved objects.
-                def forget():
-                    for (arg_ty, arg_name) in arg_tys:
-                        cls_ptr = obj.get_class_ptr(arg_ty)
-                        arg_name = camelcase_to_underscore(arg_name)
-
-                        if cls_ptr is not None and cls_ptr.owned:
-                            writer.call('::std::mem::forget', [arg_name])
-
                 # Do final transforms to return value
                 if func.ret_ty == obj.Void:
                     writer.expr(ret, discard=True)
-                    forget()
                     return
 
                 if isinstance(func.ret_ty, obj.ConvertibleType):
@@ -414,8 +425,6 @@ class RustLibCodeBuilder(CodeBuilder):
 
                 writer.declare_var('ret', init=ret)
                 ret = 'ret'
-
-                forget()
 
                 self.check_ptr(func.ret_ty, ret, '::'.join(func.path))
 
