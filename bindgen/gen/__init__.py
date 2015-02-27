@@ -1,71 +1,52 @@
-from . import utils as gen_utils
-from contextlib import contextmanager
+from ..ast.visit import TypeAggregator, FunctionAggregator, ClassAggregator, TYPE_VISIT_ENTRY, FUNCTION_VISIT_ENTRY
+from .registry import sub_registry
 
-class CodeGenerator(object):
-    def __init__(self, root):
-        self.root = root
-
-class CodeWriter(object):
-    def __init__(self, gen, file):
-        self.gen = gen
-        self.file = file
-
-        self._indent = 0
-        self._indent_text = ' ' * 4
-
-        self._newline = True
-
-    @contextmanager
-    def indent(self, amount=1):
-        self._indent += amount
-        yield
-        self._indent -= amount
-
-    def raw_write(self, data=''):
-        self.file.write(data)
-
-    def write(self, data=''):
-        for (i, line) in enumerate(data.splitlines()):
-            if i > 0:
-                self.raw_write('\n')
-                self._newline = True
-
-            if self._newline and len(line) > 0:
-                indent = self._indent_text * self._indent
-                self.raw_write(indent)
-                self._newline = False
-
-            self.raw_write(line)
-
-    def writeln(self, data=''):
-        self.write(data)
-        self.raw_write('\n')
-
-        self._newline = True
-
-class CodeBuilder(object):
-    def __init__(self, writer):
-        self.writer = writer
-
-    def c_name(self, path):
-        return gen_utils.c_name(path)
-
-    def cpp_name(self, path):
-        return gen_utils.cpp_name(path)
 
 class BindingGenerator(object):
+    LANG = None
+
     def __init__(self, root):
         self.root = root
 
+        self._registry = None
+
     def generate(self, dest):
-        pass
+        raise NotImplemented('BindingGenerator.generate')
 
     def makedir(self, path):
         if not path.exists():
             path.mkdir(parents=True)
 
-from . import c, rust, utils
+    def registry(self, entry):
+        if self._registry is None:
+            self._registry = self.create_registry()
 
-GENERATORS = []
-GENERATORS += c.GENERATORS
-GENERATORS += rust.GENERATORS
+        return self._registry.map(entry)
+
+    def create_registry(self):
+        registry = sub_registry()
+        return registry.map(self.__class__.LANG)
+
+    def create_type_aggregator(self):
+        types_registry = self.registry(TYPE_VISIT_ENTRY)
+        return TypeAggregator(types_registry)
+
+    def create_class_aggregator(self):
+        types_registry = self.registry(TYPE_VISIT_ENTRY)
+        return ClassAggregator(types_registry)
+
+    def create_function_aggregator(self):
+        functions_registry = self.registry(FUNCTION_VISIT_ENTRY)
+        return FunctionAggregator(functions_registry)
+
+
+class AggregateBindingGenerator(BindingGenerator):
+
+    def __init__(self, root, *gens):
+        super().__init__(root)
+
+        self.gens = [Generator(root) for Generator in gens]
+
+    def generate(self, dest):
+        for gen in self.gens:
+            gen.generate(dest)

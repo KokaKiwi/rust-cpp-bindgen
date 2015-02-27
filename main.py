@@ -1,27 +1,36 @@
 #!/usr/bin/env python
-import bindgen
 import sys
 from argparse import ArgumentParser
 from pathlib import Path
+from bindgen.gen.c import CBindingGenerator
+from bindgen.gen.rust import RustBindingGenerator
+
+GENERATORS = {
+    'c': CBindingGenerator,
+    'rust': RustBindingGenerator,
+}
+
+def generator(name):
+    return GENERATORS[name]
 
 def main(args):
     # Load module
     sys.path.insert(0, '.')
     mod = __import__(args.source)
 
-    if not hasattr(mod, 'root'):
+    root = getattr(mod, 'root', None)
+    if root is None:
         raise Exception('The source module (%s) does not have a `root` member.' % (args.source))
-        exit(1)
 
-    root = getattr(mod, 'root')
     dest = args.dest
+    Generator = args.generator
 
-    for Generator in bindgen.gen.GENERATORS:
-        gen = Generator(root)
-        gen.generate(dest)
+    gen = Generator(root)
+    gen.generate(dest)
 
 # Main
 parser = ArgumentParser()
+parser.add_argument('-g', '--generator', type=generator, default='rust')
 parser.add_argument('source')
 parser.add_argument('dest', type=Path)
 

@@ -1,18 +1,13 @@
+from .. import AggregateBindingGenerator
 
-class RustLibConstants:
-    INNER_TRAIT_NAME = '{name}Obj'
-    OWNED_TRAIT_NAME = '{name}Owned'
-    EXT_TRAIT_NAME = '{name}Ext'
-    STRUCT_NAME = '{name}'
-    INNER_NAME = '{name}Inner'
 
-    GET_INNER_METHOD_NAME = 'get_inner'
-    MOVE_INNER_METHOD_NAME = 'move_inner'
+class RustBindingGenerator(AggregateBindingGenerator):
+    LANG = 'rust'
 
-from .ffi import RustFFIBindingGenerator
-from .lib import RustLibBindingGenerator
+    def __init__(self, root):
+        from ..c import CBindingGenerator
+        from .ffi import RustFFIBindingGenerator
+        from .lib import RustLibBindingGenerator
 
-GENERATORS = [
-    RustFFIBindingGenerator,
-    RustLibBindingGenerator,
-]
+        super().__init__(
+            root, CBindingGenerator, RustFFIBindingGenerator, RustLibBindingGenerator)

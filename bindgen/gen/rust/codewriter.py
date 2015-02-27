@@ -1,108 +1,54 @@
-from .. import CodeWriter
 from contextlib import contextmanager
+from ..codewriter import CodeWriter
+from .codegen import RustCodeGenerator
+
 
 class RustCodeWriter(CodeWriter):
-    def _gen_proxy(name):
-        def proxy(self, *args, **kwargs):
-            m = getattr(self.gen, name)
-            self.writeln(m(*args, **kwargs))
-        return proxy
+    gen_classes = (RustCodeGenerator,)
+
+    use = CodeWriter.proxy('use')
+    extern_crate = CodeWriter.proxy('extern_crate')
+    attr = CodeWriter.proxy('attr')
+    typedef = CodeWriter.proxy('typedef')
+    declare_var = CodeWriter.proxy('declare_var')
+    assign_var = CodeWriter.proxy('assign_var')
+    declare_function = CodeWriter.proxy('declare_function', fmt='{};')
+    call = CodeWriter.proxy('call', fmt='{};')
+    comment = CodeWriter.proxy('comment')
+    ret = CodeWriter.proxy('ret')
+    struct_def = CodeWriter.proxy('struct_def')
+    enum_def = CodeWriter.proxy('enum_def')
+    mod_decl = CodeWriter.proxy('mod', fmt='{};')
 
     @contextmanager
-    def function(self, *args, **kwargs):
-        self.write(self.gen.declare_function(*args, **kwargs))
-        self.write(' ')
-        with self.block():
+    def block(self, newline=True):
+        self.writeln('{')
+        with self.indent():
+            yield
+        self.write('}')
+        if newline:
+            self.writeln()
+
+    @contextmanager
+    def unsafe(self, *args, **kwargs):
+        self.write('unsafe ')
+        with self.block(*args, **kwargs):
             yield
 
     @contextmanager
     def extern(self, *args, **kwargs):
-        self.write(self.gen.extern(*args, **kwargs))
-        self.write(' ')
+        self.write(self.gen.extern(*args, **kwargs) + ' ')
         with self.block():
             yield
 
     @contextmanager
-    def trait(self, *args, **kwargs):
-        self.write(self.gen.trait(*args, **kwargs))
-        self.write(' ')
-        with self.block():
-            yield
-
-    @contextmanager
-    def impl(self, *args, **kwargs):
-        self.write(self.gen.impl(*args, **kwargs))
-        self.write(' ')
+    def function(self, *args, **kwargs):
+        self.write(self.gen.declare_function(*args, **kwargs) + ' ')
         with self.block():
             yield
 
     @contextmanager
     def mod(self, *args, **kwargs):
-        self.write(self.gen.mod(*args, **kwargs))
-        self.write(' ')
+        self.write(self.gen.mod(*args, **kwargs) + ' ')
         with self.block():
             yield
-
-    @contextmanager
-    def unsafe(self, *args, **kwargs):
-        self.write(self.gen.unsafe(*args, **kwargs))
-        self.write(' ')
-        with self.block():
-            yield
-
-    @contextmanager
-    def match(self, *args, **kwargs):
-        self.write(self.gen.match(*args, **kwargs))
-        self.write(' ')
-        with self.block():
-            yield
-
-    @contextmanager
-    def match_pattern(self, *args, **kwargs):
-        self.write(self.gen.match_pattern(*args, **kwargs))
-        with self.block():
-            yield
-
-    @contextmanager
-    def cond(self, *args, **kwargs):
-        self.write(self.gen.cond(*args, **kwargs))
-        self.write(' ')
-        with self.block():
-            yield
-
-    @contextmanager
-    def block(self):
-        self.writeln('{')
-        with self.indent():
-            yield
-        self.writeln('}')
-
-    def call(self, *args, **kwargs):
-        self.writeln('%s;' % (self.gen.call(*args, **kwargs)))
-
-    def declare_function(self, *args, **kwargs):
-        self.writeln('%s;' % (self.gen.declare_function(*args, **kwargs)))
-
-    def declare_mod(self, *args, **kwargs):
-        self.writeln('%s;' % (self.gen.mod(*args, **kwargs)))
-
-    def panic(self, *args, **kwargs):
-        self.writeln('%s;' % (self.gen.panic(*args, **kwargs)))
-
-    def simple_impl(self, *args, **kwargs):
-        self.writeln('%s {}' % (self.gen.impl(*args, **kwargs)))
-
-    declare_var = _gen_proxy('declare_var')
-    typedef = _gen_proxy('typedef')
-    struct = _gen_proxy('struct')
-    enum = _gen_proxy('enum')
-    assign_var = _gen_proxy('assign_var')
-    comment = _gen_proxy('comment')
-    ret = _gen_proxy('ret')
-    attr = _gen_proxy('attr')
-    extern_crate = _gen_proxy('extern_crate')
-    use = _gen_proxy('use')
-    expr = _gen_proxy('expr')
-    link_attr = _gen_proxy('link_attr')
-    init_struct = _gen_proxy('init_struct')
-
