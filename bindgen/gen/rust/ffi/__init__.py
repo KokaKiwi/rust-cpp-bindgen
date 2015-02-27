@@ -62,10 +62,7 @@ class RustFFIBindingGenerator(BindingGenerator):
             if hasattr(gen, 'generate_def'):
                 gen.generate_def(writer)
 
-        # Generate raw FFI functions
         self._generate_raw(writer)
-
-        # Generate proxy FFI functions
         self._generate_proxy(writer)
 
     # Generate raw FFI functions
@@ -105,7 +102,9 @@ class RustFFIBindingGenerator(BindingGenerator):
 
                     gen.generate_raw(writer, ['super'])
 
+    # Generate proxy FFI functions
     def _generate_proxy(self, writer):
+        writer.writeln()
         self._generate_proxy_mod(writer, self.root)
 
     def _generate_proxy_mod(self, writer, mod, root=[]):
@@ -114,7 +113,14 @@ class RustFFIBindingGenerator(BindingGenerator):
 
         functions_registry = self.registry(func.ENTRY)
 
-        for item in mod:
+        items = []
+        items += [item for item in sorted(mod, key=lambda item: item.name) if isinstance(item, Module)]
+        items += [item for item in sorted(mod, key=lambda item: item.name) if isinstance(item, Function)]
+
+        for (i, item) in enumerate(items):
+            if i > 0:
+                writer.writeln()
+
             if isinstance(item, Module):
                 with writer.mod(item.name, pub=True):
                     self._generate_proxy_mod(writer, item, root=root + ['super'])
@@ -137,6 +143,7 @@ class RustFFIBindingGenerator(BindingGenerator):
         visitor = super().create_type_aggregator()
         visitor.add_class_segment(Class)
         visitor.add_class_segment(Enum)
+        visitor.sorter = lambda ty: ty.tyname
         return visitor
 
     def create_function_aggregator(self):
@@ -144,5 +151,5 @@ class RustFFIBindingGenerator(BindingGenerator):
 
         visitor = super().create_function_aggregator()
         visitor.add_segment(lambda fn: fn.__class__ is Function)
-        visitor.sorter = lambda fn: fn.real_path
+        visitor.sorter = lambda fn: '_'.join(fn.path)
         return visitor

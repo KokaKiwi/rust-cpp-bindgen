@@ -126,6 +126,7 @@ class CBindingGenerator(BindingGenerator):
         visitor = super().create_type_aggregator()
         visitor.add_class_segment(Class)
         visitor.add_class_segment(Enum)
+        visitor.sorter = lambda ty: ty.tyname
         return visitor
 
     def create_function_aggregator(self):
@@ -133,5 +134,5 @@ class CBindingGenerator(BindingGenerator):
 
         visitor = super().create_function_aggregator()
         visitor.add_segment(lambda fn: fn.__class__ is Function)
-        visitor.sorter = lambda fn: fn.real_path
+        visitor.sorter = lambda fn: '_'.join(fn.path)
         return visitor
