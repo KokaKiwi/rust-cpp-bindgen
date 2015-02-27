@@ -100,6 +100,11 @@ class String(Type):
     def __init__(self, const=False):
         self.const = const
 
+    @property
+    def tyname(self):
+        const = ' const' if self.const else ''
+        return 'string%s' % (const)
+
     def _hash(self):
         return hash(self.__class__) + hash(self.const)
 
