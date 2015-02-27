@@ -30,11 +30,11 @@ class RustFFIFunctionGenerator(RustFFIGenerator):
 
         writer.declare_function(self.ffi_name(), ret_tyname, *args, pub=True)
 
-    def generate_proxy(self, writer):
+    def generate_proxy(self, writer, root=[]):
         from bindgen.ast import Void
 
         ret_tygen = self.typegen(self.ret_ty)
-        ret_proxy = ret_tygen.proxy(out=True)
+        ret_proxy = ret_tygen.proxy(root, out=True)
 
         ret_tyname = ret_proxy.name
         if self.ret_ty is Void:
@@ -42,16 +42,16 @@ class RustFFIFunctionGenerator(RustFFIGenerator):
 
         args = []
         for (arg_ty, arg_name) in self.arg_tys:
-            arg_tyname = self.typegen(arg_ty).rust_name()
+            arg_tyname = self.typegen(arg_ty).rust_name(root)
 
             args.append((arg_tyname, arg_name))
 
         writer.writeln()
-        with writer.function(self.ffi_name(), ret_tyname, *args, pub=True):
+        with writer.function(self.func.name, ret_tyname, *args, pub=True):
             call_args = []
             for (arg_ty, arg_name) in self.arg_tys:
                 arg_tygen = self.typegen(arg_ty)
-                proxy = arg_tygen.proxy()
+                proxy = arg_tygen.proxy(root)
 
                 if proxy:
                     value = proxy(writer, arg_name)
@@ -59,7 +59,7 @@ class RustFFIFunctionGenerator(RustFFIGenerator):
 
                 call_args.append(arg_name)
 
-            call_name = self.ffi_name(['raw'])
+            call_name = self.ffi_name(root+['raw'])
             ret = writer.gen.call(call_name, *call_args)
 
             if ret_proxy:

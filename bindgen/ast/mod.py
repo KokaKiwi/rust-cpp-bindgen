@@ -61,3 +61,6 @@ class Module(Entity):
             item.name = name
 
         self.add_item(item)
+
+    def __iter__(self):
+        return iter(self.items)

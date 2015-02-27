@@ -37,14 +37,10 @@ class RustFFIBindingGenerator(BindingGenerator):
         types = self.create_type_aggregator()
         types(self.root)
 
-        functions = self.create_function_aggregator()
-        functions(self.root)
-
         linknames = LinkNamesAggregator()
         linknames(self.root)
 
         types_registry = self.registry(ty.ENTRY)
-        functions_registry = self.registry(func.ENTRY)
 
         # Generate module attributes
         def allow(name):
@@ -67,6 +63,23 @@ class RustFFIBindingGenerator(BindingGenerator):
                 gen.generate_def(writer)
 
         # Generate raw FFI functions
+        self._generate_raw(writer)
+
+        # Generate proxy FFI functions
+        self._generate_proxy(writer)
+
+    # Generate raw FFI functions
+    def _generate_raw(self, writer):
+        from .gen import func
+
+        linknames = LinkNamesAggregator()
+        linknames(self.root)
+
+        functions = self.create_function_aggregator()
+        functions(self.root)
+
+        functions_registry = self.registry(func.ENTRY)
+
         writer.writeln()
         with writer.mod('raw', pub=True):
             for linkname in linknames:
@@ -92,14 +105,24 @@ class RustFFIBindingGenerator(BindingGenerator):
 
                     gen.generate_raw(writer, ['super'])
 
-        # Generate proxy FFI functions
-        if len(functions) > 0:
-            writer.writeln()
-        for func in functions:
-            Generator = functions_registry[func.__class__]
-            gen = Generator(self, func)
+    def _generate_proxy(self, writer):
+        self._generate_proxy_mod(writer, self.root)
 
-            gen.generate_proxy(writer)
+    def _generate_proxy_mod(self, writer, mod, root=[]):
+        from bindgen.ast import Module, Function
+        from .gen import func
+
+        functions_registry = self.registry(func.ENTRY)
+
+        for item in mod:
+            if isinstance(item, Module):
+                with writer.mod(item.name, pub=True):
+                    self._generate_proxy_mod(writer, item, root=root + ['super'])
+            elif isinstance(item, Function):
+                Generator = functions_registry[item.__class__]
+                gen = Generator(self, item)
+
+                gen.generate_proxy(writer, root)
 
     def create_registry(self):
         from . import gen
