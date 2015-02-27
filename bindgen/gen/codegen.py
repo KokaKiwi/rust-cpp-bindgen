@@ -1,6 +1,7 @@
 
 class CodeGenerator(object):
-    def indent(self, text, indent=' '*4, first=False):
+
+    def indent(self, text, indent=' ' * 4, first=False):
         lines = text.splitlines()
         text = ''
         for (i, line) in enumerate(lines):

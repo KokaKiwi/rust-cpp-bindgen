@@ -6,6 +6,7 @@ from ... import BindingGenerator
 
 
 class LinkNamesAggregator(EntityVisitor, Aggregator):
+
     def __init__(self, *args, **kwargs):
         EntityVisitor.__init__(self, *args, **kwargs)
         Aggregator.__init__(self)
@@ -92,7 +93,8 @@ class RustFFIBindingGenerator(BindingGenerator):
                 if kind is not None:
                     args['kind'] = kind
 
-                args = ['%s = "%s"' % (key, value) for (key, value) in args.items()]
+                args = ['%s = "%s"' % (key, value)
+                        for (key, value) in args.items()]
                 writer.attr('link(%s)' % (', '.join(args)))
 
             with writer.extern('C'):
@@ -114,8 +116,10 @@ class RustFFIBindingGenerator(BindingGenerator):
         functions_registry = self.registry(func.ENTRY)
 
         items = []
-        items += [item for item in sorted(mod, key=lambda item: item.name) if isinstance(item, Module)]
-        items += [item for item in sorted(mod, key=lambda item: item.name) if isinstance(item, Function)]
+        items += [item for item in sorted(
+            mod, key=lambda item: item.name) if isinstance(item, Module)]
+        items += [item for item in sorted(
+            mod, key=lambda item: item.name) if isinstance(item, Function)]
 
         for (i, item) in enumerate(items):
             if i > 0:
@@ -123,7 +127,8 @@ class RustFFIBindingGenerator(BindingGenerator):
 
             if isinstance(item, Module):
                 with writer.mod(item.name, pub=True):
-                    self._generate_proxy_mod(writer, item, root=root + ['super'])
+                    self._generate_proxy_mod(
+                        writer, item, root=root + ['super'])
             elif isinstance(item, Function):
                 Generator = functions_registry[item.__class__]
                 gen = Generator(self, item)

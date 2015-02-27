@@ -58,7 +58,7 @@ class RustFFIFunctionGenerator(RustFFIGenerator):
 
                 call_args.append(arg_name)
 
-            call_name = self.ffi_name(root+['raw'])
+            call_name = self.ffi_name(root + ['raw'])
             ret = writer.gen.call(call_name, *call_args)
 
             if ret_proxy:
