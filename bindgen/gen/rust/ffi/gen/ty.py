@@ -164,16 +164,13 @@ class OptionTypeGenerator(RustFFITypeGenerator):
         name = 'Option<%s>' % (subproxy.name)
 
         def convert_in(writer, expr):
-            value = 'value'
             if subproxy:
+                var_name = 'opt_hack_%s' % (str(abs(hash(expr)))[:6])
                 value = subproxy(writer, 'value')
+                writer.declare_var(var_name, init='%s.map(|value| %s)' % (expr, value))
+                expr = var_name
 
-            newexpr = 'match %(expr)s.map(|value| %(value)s) {\n'
-            newexpr += '    None => ::std::ptr::null(),\n'
-            newexpr += '    Some(ref value) => value as *const _,\n'
-            newexpr += '}'
-
-            expr = newexpr % {'expr': expr, 'value': writer.gen.indent(value)}
+            expr = '%s.as_ref().map(|value| value as *const _).unwrap_or(::std::ptr::null())' % (expr)
             return expr
 
         # TODO: Implement this
