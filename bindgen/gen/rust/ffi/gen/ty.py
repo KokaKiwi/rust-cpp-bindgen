@@ -3,6 +3,14 @@ from . import RustFFIGenerator
 ENTRY = 'ffi-type'
 
 
+def mhash(data):
+    import hashlib
+
+    if not isinstance(data, bytes):
+        data = bytes(data, 'utf-8')
+    return hashlib.md5(data).hexdigest()
+
+
 class Proxy(object):
 
     # convert function must be of the form:
@@ -165,7 +173,7 @@ class OptionTypeGenerator(RustFFITypeGenerator):
 
         def convert_in(writer, expr):
             if subproxy:
-                var_name = 'opt_hack_%s' % (str(abs(hash(expr)))[:6])
+                var_name = 'opt_hack_%s' % (mhash(expr)[:6])
                 value = subproxy(writer, 'value')
                 writer.declare_var(var_name, init='%s.map(|value| %s)' % (expr, value))
                 expr = var_name
