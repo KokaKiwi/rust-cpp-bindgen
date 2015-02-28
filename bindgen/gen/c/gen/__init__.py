@@ -10,7 +10,7 @@ class CGenerator(object):
     def typegen(self, ty):
         from . import ty as gen_ty
 
-        Generator = self.registry(gen_ty.ENTRY)[ty.__class__]
+        Generator = self.registry(gen_ty.ENTRY)[ty]
         return Generator(self.parent, ty)
 
     def gen_c_name(self, path):

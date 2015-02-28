@@ -67,7 +67,7 @@ class CBindingGenerator(BindingGenerator):
 
         types_registry = self.registry(ty.ENTRY)
         for ty in visitor:
-            Generator = types_registry[ty.__class__]
+            Generator = types_registry[ty]
             gen = Generator(self, ty)
 
             if hasattr(gen, 'generate_def'):
@@ -80,7 +80,7 @@ class CBindingGenerator(BindingGenerator):
 
         functions_registry = self.registry(func.ENTRY)
         for func in visitor:
-            Generator = functions_registry[func.__class__]
+            Generator = functions_registry[func]
             gen = Generator(self, func)
 
             writer.writeln()
@@ -107,7 +107,7 @@ class CBindingGenerator(BindingGenerator):
 
         functions_registry = self.registry(func.ENTRY)
         for func in visitor:
-            Generator = functions_registry[func.__class__]
+            Generator = functions_registry[func]
             gen = Generator(self, func)
 
             writer.writeln()

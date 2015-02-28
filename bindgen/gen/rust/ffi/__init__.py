@@ -57,7 +57,7 @@ class RustFFIBindingGenerator(BindingGenerator):
         if len(types) > 0:
             writer.writeln()
         for ty in types:
-            Generator = types_registry[ty.__class__]
+            Generator = types_registry[ty]
             gen = Generator(self, ty)
 
             if hasattr(gen, 'generate_def'):
@@ -99,7 +99,7 @@ class RustFFIBindingGenerator(BindingGenerator):
 
             with writer.extern('C'):
                 for func in functions:
-                    Generator = functions_registry[func.__class__]
+                    Generator = functions_registry[func]
                     gen = Generator(self, func)
 
                     gen.generate_raw(writer, ['super'])
@@ -130,7 +130,7 @@ class RustFFIBindingGenerator(BindingGenerator):
                     self._generate_proxy_mod(
                         writer, item, root=root + ['super'])
             elif isinstance(item, Function):
-                Generator = functions_registry[item.__class__]
+                Generator = functions_registry[item]
                 gen = Generator(self, item)
 
                 gen.generate_proxy(writer, root)

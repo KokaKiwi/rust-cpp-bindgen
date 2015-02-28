@@ -1,4 +1,5 @@
 from contextlib import contextmanager
+from functools import wraps
 from . import ty as gen_ty
 from . import CGenerator
 
@@ -131,6 +132,10 @@ class MethodGenerator(CFunctionGenerator):
         self_arg = (self.func.self_ty, 'self')
         return [self_arg] + super().arg_tys
 
+    @property
+    def self_ty(self):
+        return self.arg_tys[0]
+
 # TODO: Make constructors return something else than a
 #       pointer by default.
 
@@ -140,7 +145,8 @@ class ConstructorGenerator(CFunctionGenerator):
     def generate_call(self, writer, ctx):
         from bindgen.ast import Constructor
 
-        ctor_name = self.gen_cpp_name(self.func.parent.real_path)
+        parent_gen = self.typegen(self.func.parent)
+        ctor_name = parent_gen.cpp_name
 
         if self.func.null == Constructor.Null.nothrow:
             call_name = 'new(std::nothrow) %s' % (ctor_name)
@@ -191,3 +197,19 @@ def register(reg):
 
     reg[Constructor] = ConstructorGenerator
     reg[Destructor] = DestructorGenerator
+
+
+# Utils functions
+
+
+def raw_function(func):
+    from .. import CBindingGenerator
+
+    def wrapper(cls):
+        registry = getattr(func, '__registry', {})
+        entry_registry = registry.get(ENTRY, {})
+        entry_registry[CBindingGenerator.LANG] = cls
+        registry[ENTRY] = entry_registry
+        func.__registry = registry
+
+    return wrapper

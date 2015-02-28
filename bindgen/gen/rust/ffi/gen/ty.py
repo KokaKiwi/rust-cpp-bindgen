@@ -25,7 +25,7 @@ class RustFFITypeGenerator(RustFFIGenerator):
         self.ty = ty
 
     def typegen(self, ty):
-        Generator = self.registry(ENTRY)[ty.__class__]
+        Generator = self.registry(ENTRY)[ty]
         return Generator(self.parent, ty)
 
     def proxy(self, root=[], out=False):

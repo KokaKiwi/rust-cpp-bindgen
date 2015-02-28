@@ -17,10 +17,11 @@ class Module(Entity):
         return self
 
     def add_item(self, item):
+        self.items = [it for it in self.items if it.name != item.name]
+
         item.parent = self
         self.items.append(item)
 
-    # TODO: This method should verify there's no other items with same name
     def new_item(self, cls, *args, **kwargs):
         item = cls(*args, **kwargs)
         self.add_item(item)

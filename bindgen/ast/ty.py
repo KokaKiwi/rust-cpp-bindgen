@@ -46,7 +46,7 @@ class BuiltinType(Type):
 
     @property
     def tyname(self):
-        return 'BuiltinType %s' % (self.ty.name)
+        return self.ty.name
 
     def _hash(self):
         return hash(self.__class__) + hash(self.ty)
@@ -87,7 +87,7 @@ class Optionnable(Type):
 
     @property
     def tyname(self):
-        return 'Option<%s> = %s' % (self.subtype.tyname, self.default)
+        return 'option_%s' % (self.subtype.tyname)
 
     def _hash(self):
         return hash(self.__class__) + hash(self.subtype) + hash(self.default)
@@ -99,6 +99,11 @@ class String(Type):
 
     def __init__(self, const=False):
         self.const = const
+
+    @property
+    def name(self):
+        const = '_const' if self.const else ''
+        return 'string%s' % (const)
 
     @property
     def tyname(self):
@@ -128,8 +133,8 @@ class Ref(Type):
 
     @property
     def tyname(self):
-        const = 'const ' if self.const else ''
-        return '%s%s&' % (const, self.subtype.tyname)
+        const = '_const' if self.const else ''
+        return 'ref_%s%s' % (self.subtype.tyname, const)
 
     def _hash(self):
         return hash(self.__class__) + hash(self.subtype) + hash(self.const)
@@ -147,8 +152,8 @@ class Pointer(Type):
 
     @property
     def tyname(self):
-        const = 'const ' if self.const else ''
-        return '%s%s*' % (const, self.subtype.tyname)
+        const = '_const' if self.const else ''
+        return 'ptr_%s%s' % (self.subtype.tyname, const)
 
     def _hash(self):
         return hash(self.__class__) + hash(self.subtype) + hash(self.const) + hash(self.owned) + hash(self.nullable)

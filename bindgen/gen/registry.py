@@ -3,66 +3,48 @@ import inspect
 from collections import defaultdict
 
 
-class Entries(object):
-
-    def __init__(self):
-        self.entries = {}
-
-    def get(self, cls, default=None):
-        try:
-            return self[cls]
-        except KeyError:
-            return default
-
-    def __getitem__(self, cls):
-        mro = inspect.getmro(cls)
-
-        for cls in mro:
-            entry = self.entries.get(cls, None)
-            if entry is not None:
-                return entry
-
-        raise KeyError(cls)
-
-    def __setitem__(self, cls, value):
-        self.entries[cls] = value
-
-    def __contains__(self, cls):
-        try:
-            entry = self[cls]
-            return True
-        except KeyError:
-            return False
-
-    def __repr__(self):
-        return repr(self.entries)
-
-
 class Registry(object):
 
     def __init__(self, parent=None):
         self.parent = parent
 
-        self.mapping = defaultdict(lambda: defaultdict(Entries))
+        self.mapping = defaultdict(lambda: defaultdict(dict))
 
-    def register(self, entry, lang, cls, value):
-        self.mapping[entry][lang][cls] = value
+    def register(self, entry, lang, key, value):
+        self.mapping[entry][lang][key] = value
 
     # The searching algorithm is the following:
     # 1 - Search in the entries for specified lang.
     # 2 - Search in the entries for `None` lang.
     # 3 - Search in the parent registry
-    def get(self, entry, lang, cls):
+    def get(self, entry, lang, key):
+        key_registry = getattr(key, '__registry', {})
+        entry_registry = key_registry.get(entry, {})
+        value = entry_registry.get(lang, None)
+        if value is not None:
+            return value
+
+        def search(cls):
+            value = self.mapping[entry][lang].get(cls)
+            if value is None:
+                value = self.mapping[entry][None].get(cls)
+            if value is None and self.parent is not None:
+                value = self.parent.get(entry, lang, cls)
+            return value
+
+        cls = key
         if not inspect.isclass(cls):
-            raise TypeError('Expected Python class, got object <%s>' % (cls))
+            cls = cls.__class__
 
-        value = self.mapping[entry][lang].get(cls)
-        if value is None:
-            value = self.mapping[entry][None].get(cls)
-        if value is None and self.parent is not None:
-            value = self.parent.get(entry, lang, cls)
+        mro = inspect.getmro(cls)
+        for base in mro:
+            value = search(base)
+            if value is None:
+                continue
 
-        return value
+            return value
+
+        return None
 
     def map(self, lang):
         return LangRegistry(self, lang)
@@ -76,11 +58,11 @@ class LangRegistry(object):
         self.registry = registry
         self.lang = lang
 
-    def get(self, entry, cls):
-        return self.registry.get(entry, self.lang, cls)
+    def get(self, entry, key):
+        return self.registry.get(entry, self.lang, key)
 
-    def register(self, entry, cls, value):
-        self.registry.register(entry, self.lang, cls, value)
+    def register(self, entry, key, value):
+        self.registry.register(entry, self.lang, key, value)
 
     def map(self, entry):
         return MappedRegistry(self, entry)
@@ -94,17 +76,17 @@ class MappedRegistry(object):
         self.registry = registry
         self.entry = entry
 
-    def get(self, cls):
-        return self.registry.get(self.entry, cls)
+    def get(self, key):
+        return self.registry.get(self.entry, key)
 
-    def register(self, cls, value):
-        self.registry.register(self.entry, cls, value)
+    def register(self, key, value):
+        self.registry.register(self.entry, key, value)
 
-    def __getitem__(self, cls):
-        value = self.get(cls)
+    def __getitem__(self, key):
+        value = self.get(key)
 
         if value is None:
-            raise KeyError(cls)
+            raise KeyError(key)
 
         return value
 

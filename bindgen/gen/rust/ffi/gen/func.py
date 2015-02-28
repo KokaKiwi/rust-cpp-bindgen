@@ -12,7 +12,7 @@ class RustFFIFunctionGenerator(RustFFIGenerator):
     def typegen(self, ty):
         from . import ty as gen_ty
 
-        Generator = self.registry(gen_ty.ENTRY)[ty.__class__]
+        Generator = self.registry(gen_ty.ENTRY)[ty]
         return Generator(self.parent, ty)
 
     def generate_raw(self, writer, root=[]):

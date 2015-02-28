@@ -44,7 +44,10 @@ class Class(Type, Module):
 
     @property
     def tyname(self):
-        return 'Class %s' % (self.name)
+        path = self.path
+        while path[0] == '':
+            del path[0]
+        return '_'.join(path)
 
     def _hash(self):
         from .entity import Entity
