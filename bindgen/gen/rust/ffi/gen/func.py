@@ -46,6 +46,7 @@ class RustFFIFunctionGenerator(RustFFIGenerator):
 
             args.append((arg_tyname, arg_name))
 
+        writer.attr('inline(always)')
         with writer.function(self.func.name, ret_tyname, *args, pub=True):
             call_args = []
             for (arg_ty, arg_name) in self.arg_tys:
