@@ -175,7 +175,8 @@ class OptionTypeGenerator(RustFFITypeGenerator):
             if subproxy:
                 var_name = 'opt_hack_%s' % (mhash(expr)[:6])
                 value = subproxy(writer, 'value')
-                writer.declare_var(var_name, init='%s.map(|value| %s)' % (expr, value))
+                writer.declare_var(
+                    var_name, init='%s.map(|value| %s)' % (expr, value))
                 expr = var_name
 
             expr = '%s.as_ref().map(|value| value as *const _).unwrap_or(::std::ptr::null())' % (expr)
