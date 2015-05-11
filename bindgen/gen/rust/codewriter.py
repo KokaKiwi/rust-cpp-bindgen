@@ -52,3 +52,9 @@ class RustCodeWriter(CodeWriter):
         self.write(self.gen.mod(*args, **kwargs) + ' ')
         with self.block():
             yield
+
+    @contextmanager
+    def impl(self, *args, **kwargs):
+        self.write(self.gen.impl(*args, **kwargs) + ' ')
+        with self.block():
+            yield

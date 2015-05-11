@@ -233,5 +233,8 @@ class RustCodeGenerator(CodeGenerator):
 
         return text
 
+    def impl(self, name):
+        return 'impl %s' % (name)
+
     def ternary(self, cond_value, then_value, else_value):
         return 'if %s { %s } else { %s }' % (cond_value, then_value, else_value)
