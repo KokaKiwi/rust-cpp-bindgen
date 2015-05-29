@@ -1,0 +1,9 @@
+[package]
+name = "bindgen_example"
+version = "0.1.0"
+authors = ["KokaKiwi <kokakiwi@kokakiwi.net>"]
+
+build = "build.rs"
+
+[build-dependencies]
+gcc = "*"

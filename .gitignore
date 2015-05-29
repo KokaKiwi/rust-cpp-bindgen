@@ -3,6 +3,9 @@
 __pycache__
 *.pyc
 
+# Example files
+target
+
 # Misc files
 .*
 !.gitignore
