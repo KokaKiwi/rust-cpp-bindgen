@@ -7,8 +7,7 @@ class root:
         'extern_lib.hpp',
     }
 
-Sample = root.Class('Sample')
-@Sample.body
+@root.Class('Sample')
 class Sample:
     new = Constructor((String(const=True), 'name'))
     delete = Destructor()

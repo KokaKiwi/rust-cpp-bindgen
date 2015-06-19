@@ -16,6 +16,8 @@ class Module(Entity):
 
         return self
 
+    __call__ = body
+
     def add_item(self, item):
         self.items = [it for it in self.items if it.name != item.name]
 
