@@ -1,9 +1,8 @@
-#!/usr/bin/env python
 import sys
 from argparse import ArgumentParser
 from pathlib import Path
-from bindgen.gen.c import CBindingGenerator
-from bindgen.gen.rust import RustBindingGenerator
+from rust_bindgen.gen.c import CBindingGenerator
+from rust_bindgen.gen.rust import RustBindingGenerator
 
 GENERATORS = {
     'c': CBindingGenerator,
@@ -34,5 +33,5 @@ parser.add_argument('-g', '--generator', type=generator, default='rust')
 parser.add_argument('source')
 parser.add_argument('dest', type=Path)
 
-if __name__ == '__main__':
+def entry():
     main(parser.parse_args())

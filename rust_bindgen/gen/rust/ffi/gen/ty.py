@@ -110,7 +110,7 @@ class BuiltinTypeGenerator(RustFFITypeGenerator):
 class StringTypeGenerator(RustFFITypeGenerator):
 
     def generate_def(self, writer):
-        from bindgen.ast import SizeTy
+        from rust_bindgen.ast import SizeTy
 
         data_ty = self.typegen(self.data_type)
         size_ty = self.typegen(SizeTy)
@@ -124,11 +124,11 @@ class StringTypeGenerator(RustFFITypeGenerator):
 
     @property
     def data_type(self):
-        from bindgen.ast import Pointer, Char
+        from rust_bindgen.ast import Pointer, Char
         return Pointer(Char, const=self.ty.const)
 
     def proxy(self, root=[], out=False):
-        from bindgen.ast import SizeTy
+        from rust_bindgen.ast import SizeTy
 
         name = self.ffi_name(root) if out else '&str'
 
@@ -189,7 +189,7 @@ class OptionTypeGenerator(RustFFITypeGenerator):
         return Proxy(name, convert_out if out else convert_in)
 
     def ffi_name(self, root=[]):
-        from bindgen.ast import Pointer
+        from rust_bindgen.ast import Pointer
 
         ty = Pointer(self.ty.subtype, const=True)
         gen = self.typegen(ty)
@@ -274,9 +274,9 @@ class EnumTypeGenerator(RustFFITypeGenerator):
 
 
 def register(reg):
-    from bindgen.ast.cls import Class
-    from bindgen.ast.enum import Enum
-    from bindgen.ast.ty import BuiltinType, String, Option, Ref, Pointer
+    from rust_bindgen.ast.cls import Class
+    from rust_bindgen.ast.enum import Enum
+    from rust_bindgen.ast.ty import BuiltinType, String, Option, Ref, Pointer
 
     reg[BuiltinType] = BuiltinTypeGenerator
     reg[String] = StringTypeGenerator

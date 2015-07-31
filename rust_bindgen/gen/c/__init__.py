@@ -1,4 +1,4 @@
-from bindgen.ast.visit import EntityVisitor, Aggregator
+from rust_bindgen.ast.visit import EntityVisitor, Aggregator
 from .. import BindingGenerator
 from ..registry import MappedRegistry, sub_registry
 from .codegen import CCodeGenerator
@@ -121,7 +121,7 @@ class CBindingGenerator(BindingGenerator):
         return reg
 
     def create_type_aggregator(self):
-        from bindgen.ast import Class, Enum
+        from rust_bindgen.ast import Class, Enum
 
         visitor = super().create_type_aggregator()
         visitor.add_class_segment(Class)
@@ -130,7 +130,7 @@ class CBindingGenerator(BindingGenerator):
         return visitor
 
     def create_function_aggregator(self):
-        from bindgen.ast import Function
+        from rust_bindgen.ast import Function
 
         visitor = super().create_function_aggregator()
         visitor.add_segment(lambda fn: fn.__class__ is Function)

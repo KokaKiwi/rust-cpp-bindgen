@@ -1,4 +1,4 @@
-from bindgen.ast.visit import Aggregator, EntityVisitor
+from rust_bindgen.ast.visit import Aggregator, EntityVisitor
 from .. import RustBindingGenerator
 from ..codegen import RustCodeGenerator
 from ..codewriter import RustCodeWriter
@@ -110,7 +110,7 @@ class RustFFIBindingGenerator(BindingGenerator):
         self._generate_proxy_mod(writer, self.root)
 
     def _generate_proxy_mod(self, writer, mod, root=[]):
-        from bindgen.ast import Module, Function
+        from rust_bindgen.ast import Module, Function
         from .gen import func
 
         functions_registry = self.registry(func.ENTRY)
@@ -143,7 +143,7 @@ class RustFFIBindingGenerator(BindingGenerator):
         return reg
 
     def create_type_aggregator(self):
-        from bindgen.ast import Class, Enum
+        from rust_bindgen.ast import Class, Enum
 
         visitor = super().create_type_aggregator()
         visitor.add_class_segment(Class)
@@ -152,7 +152,7 @@ class RustFFIBindingGenerator(BindingGenerator):
         return visitor
 
     def create_function_aggregator(self):
-        from bindgen.ast import Function
+        from rust_bindgen.ast import Function
 
         visitor = super().create_function_aggregator()
         visitor.add_segment(lambda fn: fn.__class__ is Function)

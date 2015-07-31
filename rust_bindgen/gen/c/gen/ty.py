@@ -121,7 +121,7 @@ class StringTypeGenerator(CTypeGenerator):
 
     @property
     def data_type(self):
-        from bindgen.ast import Pointer, Char
+        from rust_bindgen.ast import Pointer, Char
         return Pointer(Char, const=self.ty.const)
 
     @property
@@ -168,7 +168,7 @@ class OptionTypeGenerator(CTypeGenerator):
 
     @property
     def cpp_name(self):
-        from bindgen.ast import Pointer
+        from rust_bindgen.ast import Pointer
 
         ty = Pointer(self.ty.subtype)
         gen = self.typegen(ty)
@@ -176,7 +176,7 @@ class OptionTypeGenerator(CTypeGenerator):
 
     @property
     def ffi_name(self):
-        from bindgen.ast import Pointer
+        from rust_bindgen.ast import Pointer
 
         ty = Pointer(self.ty.subtype)
         gen = self.typegen(ty)
@@ -345,9 +345,9 @@ class EnumTypeGenerator(CTypeGenerator):
 
 
 def register(reg):
-    from bindgen.ast.cls import Class
-    from bindgen.ast.enum import Enum
-    from bindgen.ast.ty import BuiltinType, String, Option, Ref, Pointer
+    from rust_bindgen.ast.cls import Class
+    from rust_bindgen.ast.enum import Enum
+    from rust_bindgen.ast.ty import BuiltinType, String, Option, Ref, Pointer
 
     reg[BuiltinType] = BuiltinTypeGenerator
     reg[String] = StringTypeGenerator

@@ -16,7 +16,7 @@ class RustFFIFunctionGenerator(RustFFIGenerator):
         return Generator(self.parent, ty)
 
     def generate_raw(self, writer, root=[]):
-        from bindgen.ast import Void
+        from rust_bindgen.ast import Void
 
         ret_tyname = self.typegen(self.ret_ty).ffi_name(root)
         if self.ret_ty is Void:
@@ -31,7 +31,7 @@ class RustFFIFunctionGenerator(RustFFIGenerator):
         writer.declare_function(self.ffi_name(), ret_tyname, *args, pub=True)
 
     def generate_proxy(self, writer, root=[]):
-        from bindgen.ast import Void
+        from rust_bindgen.ast import Void
 
         ret_tygen = self.typegen(self.ret_ty)
         ret_proxy = ret_tygen.proxy(root, out=True)
@@ -101,7 +101,7 @@ class ConstructorGenerator(RustFFIFunctionGenerator):
 
     @property
     def ret_ty(self):
-        from bindgen.ast import Pointer
+        from rust_bindgen.ast import Pointer
         return Pointer(self.func.parent, owned=True)
 
 
@@ -114,8 +114,8 @@ class DestructorGenerator(RustFFIFunctionGenerator):
 
 
 def register(reg):
-    from bindgen.ast import Function, StaticMethod
-    from bindgen.ast import Method, Constructor, Destructor
+    from rust_bindgen.ast import Function, StaticMethod
+    from rust_bindgen.ast import Method, Constructor, Destructor
 
     reg[Function] = FunctionGenerator
 

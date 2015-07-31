@@ -31,7 +31,7 @@ class CFunctionGenerator(CGenerator):
         writer.declare_function(self.ffi_name, ret_tyname, *args)
 
     def generate_impl(self, writer):
-        from bindgen.ast import Void
+        from rust_bindgen.ast import Void
         from .ty import TypeConvert
 
         ret_tygen = self.typegen(self.ret_ty)
@@ -143,7 +143,7 @@ class MethodGenerator(CFunctionGenerator):
 class ConstructorGenerator(CFunctionGenerator):
 
     def generate_call(self, writer, ctx):
-        from bindgen.ast import Constructor
+        from rust_bindgen.ast import Constructor
 
         parent_gen = self.typegen(self.func.parent)
         ctor_name = parent_gen.cpp_name
@@ -172,7 +172,7 @@ class ConstructorGenerator(CFunctionGenerator):
 
     @property
     def ret_ty(self):
-        from bindgen.ast import Pointer
+        from rust_bindgen.ast import Pointer
         return Pointer(self.func.parent, owned=True)
 
 
@@ -188,7 +188,7 @@ class DestructorGenerator(CFunctionGenerator):
 
 
 def register(reg):
-    from bindgen.ast import Function, StaticMethod, Method, Constructor, Destructor
+    from rust_bindgen.ast import Function, StaticMethod, Method, Constructor, Destructor
 
     reg[Function] = FunctionGenerator
 

@@ -1,7 +1,10 @@
 # Build files
 /out
+/dist
+/build
 __pycache__
 *.pyc
+*.egg-info
 
 # Example files
 target
