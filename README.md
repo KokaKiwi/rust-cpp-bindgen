@@ -1,5 +1,5 @@
-rust-cpp-bindgen
-================
+rust-cpp-bindgen: An (almost) safe C++ bindings generator for Rust
+==================================================================
 
 An attempt to bind some C++ code to Rust.
 
